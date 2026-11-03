@@ -78,7 +78,7 @@ Con un Rode Wireless PRO y una fp de pruebas, salvo donde se indica:
 
 - **El audio es mono cuando hay TC.** La grabación tiene dos canales y uno lo ocupa el TC.
 - **Con TC en los dos canales y Audio Input en Auto,** el micro interno entra al pulsar REC. Hasta entonces los vúmetros pueden mostrar el TC. Con Internal pasa lo mismo.
-- **Zoom M4: usa Internal.** El Zoom lleva la entrada y la salida de TC en el mismo cable, un contacto para cada una, así que no manda TC por los dos canales: por uno sale el TC y el otro es su entrada. Por esa entrada se cuela un eco del TC (picos en cada flanco) que el módulo no puede leer como TC y trata como audio. En Auto se grabaría ese eco en los dos canales. Lo hemos medido en el WAV; qué contacto es cada uno no lo hemos comprobado en el manual del Zoom.
+- **Zoom M4: usa Internal.** El Zoom lleva la entrada y la salida de TC en el mismo cable, un contacto para cada una, así que no manda TC por los dos canales: por uno sale el TC y el otro es su entrada. Por esa entrada se cuela un eco del TC (picos en cada flanco) que el módulo no puede leer como TC y trata como audio. En Auto se grabaría ese eco en los dos canales. El eco lo hemos medido en el WAV.
 - **La cámara no reajusta el TC durante una toma.** Si enchufas el jack en plena toma, cambia el audio; el TC se corrige en la toma siguiente.
 - **Al enchufar o quitar el jack grabando** la cámara no se cuelga. Hay cerca de un segundo de transición, y al enchufar se puede oír LTC un instante.
 - **La perilla de ganancia del canal del TC** se puede mover, pero no cambia ni el sonido ni el vúmetro. No se ha probado al máximo. La del canal de audio mueve los dos vúmetros.
