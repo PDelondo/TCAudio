@@ -37,7 +37,7 @@ The module adds two rows to the **Audio Recording > On** submenu. Their values s
 | Off | Internal | Off | Anything | Internal mics in stereo, as if the jack were not there |
 | Off | Auto | On | Mic | Internal mics on channel 1 and the jack on channel 2 |
 
-**Rule of thumb:** Auto if the generator sends audio on the other channel; Internal if it only sends TC (Deity L-OUT, Zoom M4). On Auto, whatever arrives on the other channel is recorded.
+**Rule of thumb:** on Auto the module tells the TC channel from the audio channel and records the audio. If the generator sends no audio (Deity L-OUT, Zoom M4), use Internal: on Auto whatever arrives on the other channel would be recorded, silence or noise.
 
 With TC-IN on, TC always comes from the jack, and Int+Ext Mics stays Off: if you turn it on, it returns by itself. With Int+Ext Mics On, Audio Input only allows Auto. Int+Ext Mics takes the right jack channel: check your mic arrives there, or use a cable with both channels bridged.
 

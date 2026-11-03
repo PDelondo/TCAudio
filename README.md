@@ -37,7 +37,7 @@ El módulo añade dos filas en el submenú de **Grabación de audio > On**. Los 
 | Apagado | Internal | Off | Lo que sea | Micros internos en estéreo, como si el jack no estuviera |
 | Apagado | Auto | On | Micro | Micros internos en el canal 1 y el jack en el canal 2 |
 
-**Regla para elegir:** Auto si el generador manda audio por el otro canal; Internal si solo manda TC (Deity L-OUT, Zoom M4). En Auto se graba lo que llegue por el otro canal, sea lo que sea.
+**Regla para elegir:** en Auto el módulo distingue el canal del TC del de audio y graba el audio. Si el generador no manda audio (Deity L-OUT, Zoom M4), usa Internal: en Auto se grabaría lo que llegue por el otro canal, sea silencio o ruido.
 
 Con TC-IN activo, el TC siempre viene del jack, y Int+Ext Mics se queda en Off: si la activas, vuelve sola. Con Int+Ext Mics en On, Audio Input solo admite Auto. Int+Ext Mics toma el canal derecho del jack: comprueba que tu micro llega por ahí, o usa un cable con los dos canales puenteados.
 
