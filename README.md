@@ -90,7 +90,7 @@ Con un Rode Wireless PRO y una fp de pruebas, salvo donde se indica:
 
 - **Zoom M4:** usa Internal. El Zoom lleva la entrada y la salida de TC en el mismo jack (según su manual, la punta es la entrada y el anillo la salida), así que no manda TC por los dos canales: con un cable estéreo, el TC llega al canal derecho y el izquierdo va a la entrada del Zoom. Por esa entrada se cuela un eco del TC (picos en cada flanco) que el módulo no puede leer como TC y trata como audio. En Auto se grabaría ese eco en los dos canales.
 - **Deity TC-1:** para grabar el micro del TC-1, ponlo en A-OUT con Audio Input en Auto. Para grabar el micro de la cámara, ponlo en L-OUT con Audio Input en Internal.
-- **Para cambiar de generador,** apaga la cámara, conecta el nuevo y vuelve a encenderla. Si lo cambias con la cámara encendida en Internal y el TC no engancha, pon Audio Input en Auto un momento y vuelve a Internal.
+- **Para cambiar de generador,** apaga la cámara, conecta el nuevo y vuelve a encenderla. Si lo cambias con la cámara encendida, puedes tener problemas de lectura.
 
 ### Del módulo
 
