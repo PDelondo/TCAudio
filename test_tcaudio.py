@@ -291,6 +291,18 @@ class TcaudioTests(unittest.TestCase):
         self.assertEqual(cam.w(0xC00DA154), 0x2128D10D)
         self.assertEqual(cam.w(0xC00DAA18), 0x20052128)
 
+    def test_ltc_reaching_the_right_after_the_lock_selects_the_mic(self):
+        # engancha con el izquierdo solo; el LTC llega al derecho después, con bloques de un octavo
+        # de trama: con la 1.2.0 el derecho solo se oye a ratos y nunca completa una trama
+        data = bytearray(self.both_channels())
+        late = BLOCK * 40
+        data[2:late:4] = bytes(len(range(2, late, 4)))
+        data[3:late:4] = bytes(len(range(3, late, 4)))
+        cam = self.boot()
+        self.feed(cam, bytes(data), block=BLOCK // 8)
+        self.assertEqual(cam.w(0xC00DA154), 0x2128D10D)
+        self.assertEqual(cam.w(0xC00DAA18), 0x20052128)
+
     def test_mic_is_left_when_the_ltc_goes(self):
         cam = self.boot()
         self.feed(cam, self.both_channels() [:BLOCK * 120] + bytes(BLOCK * 80))
