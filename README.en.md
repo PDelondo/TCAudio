@@ -28,7 +28,7 @@ The module adds two rows to the **Audio Recording > On** submenu. Their values s
 | TC-IN | Audio Input | Int+Ext Mics | On the jack | Recorded |
 |---|---|---|---|---|
 | On | Auto | Not available | TC + audio | Jack audio on both channels |
-| On | Auto | Not available | TC on both channels | Internal mic on both channels |
+| On | Auto | Not available | TC on both channels (RWP in all-TC mode) | Internal mic on both channels |
 | On | Internal | Not available | TC + audio, TC on channel 2 (RWP) | Internal mic on both channels |
 | On | Internal | Not available | TC on both channels | Internal mic on both channels |
 | On | Internal | Not available | TC on channel 1, nothing on the other (Deity L-OUT) | Internal mic on both channels |
@@ -36,6 +36,8 @@ The module adds two rows to the **Audio Recording > On** submenu. Their values s
 | Off | Auto | Off | Anything | Whatever enters the jack, as stock |
 | Off | Internal | Off | Anything | Internal mics in stereo, as if the jack were not there |
 | Off | Auto | On | Mic | Internal mics on channel 1 and the jack on channel 2 |
+
+**Rule of thumb:** Auto if the generator sends audio on the other channel; Internal if it only sends TC (Deity L-OUT, Zoom M4). On Auto, whatever arrives on the other channel is recorded.
 
 With TC-IN on, TC always comes from the jack, and Int+Ext Mics stays Off: if you turn it on, it returns by itself. With Int+Ext Mics On, Audio Input only allows Auto. Int+Ext Mics takes the right jack channel: check your mic arrives there, or use a cable with both channels bridged.
 
@@ -70,23 +72,25 @@ With a Rode Wireless PRO and a test fp, except where noted:
 - A constant 1 frame between the camera audio and audio recorded on the RWP transmitters.
 - Lock verified at 23.98, 25 and 29.97 (drop-frame too), and rejected when rates do not match.
 - Deity TC-1 on A-OUT, with TC on channel 1: locks at its rates, including 59.94.
+- 1.2.1: RWP in all-TC mode with Audio Input on Auto records the internal mic (1.2.0 recorded the LTC).
 
 ## Known limitations
 
 - **Audio is mono while TC is present.** Recording has two channels and TC takes one.
-- **With TC on both channels and Audio Input on Auto,** the internal mic comes in on leaving the menu or pressing REC. Until then the meters may show the TC.
+- **With TC on both channels and Audio Input on Auto,** the internal mic comes in when you press REC. Until then the meters may show the TC. Internal behaves the same.
+- **Zoom M4: use Internal.** The Zoom carries TC in and TC out on the same cable, one contact each, so it does not send TC on both channels: one carries the TC and the other is its input. An echo of the TC leaks into that input (spikes at each edge), which the module cannot read as TC and treats as audio. On Auto that echo would be recorded on both channels. We measured this in the WAV; which contact is which has not been checked in the Zoom manual.
 - **The camera does not re-jam TC during a take.** Plugging the jack mid-take changes the audio; TC is corrected on the next take.
-- **Plugging or unplugging the jack while recording** causes about a second of transition, and LTC may be heard for an instant when plugging in.
+- **Plugging or unplugging the jack while recording** does not hang the camera. There is about a second of transition, and LTC may be heard briefly when plugging in.
 - **The gain knob of the TC channel** can be moved but changes neither sound nor meter. It has not been tested at maximum. The audio channel's knob moves both meters.
 - **TC on channel 1 with audio on the other (Deity TC-1 on A-OUT) does not support Internal:** they would mix. For the camera mic use L-OUT; for the Deity mic, A-OUT in Auto.
 - **In Auto, with TC on one channel and nothing on the other** (Deity L-OUT), there is no sound to record: use Internal.
-- **To change generator,** it is best to turn the camera off and on.
+- **To change generator,** turn the camera off and on. On Internal, if the new generator sends TC on the other channel, the camera does not see it until a restart or a pass through Auto.
+- **Drop-frame (a limitation of the fp, not of the module):** with TC-IN the camera does not let you choose DF and seems not to accept it: it always counts non-drop (NDF). With a 29.97 DF generator, the DNG timecode runs 2 frames ahead at each minute change (except multiples of 10) within a take. Set the generator to NDF.
 - **Switching Audio Recording from ON to OFF** leaves the meter showing signal until you record or pass through the menu.
 
 ## Not tested
 
 - Other generators.
-- Drop-frame takes that cross a minute.
 - 48 and 50 fps with TC.
 
 ## Building
