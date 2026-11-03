@@ -141,7 +141,7 @@ class TcaudioTests(unittest.TestCase):
             d = (bcd(b)[2] * 24 + bcd(b)[3]) - (bcd(a)[2] * 24 + bcd(a)[3])
             self.assertIn(d % (60 * 24), (1, 2), (hex(a), hex(b)))
 
-    def feed(self, cam, data):
+    def feed(self, cam, data, block=BLOCK):
         cam.put(0xC31D17DC, 1)
         cam.put(0x2AA01244, DSP)
         cam.put(0xC31D23F8, RING)
@@ -150,9 +150,9 @@ class TcaudioTests(unittest.TestCase):
         tick = cam.w(0xC00D6EC4) & ~1
         wp, seen = 0, []
         cam.call(tick, thumb=True)
-        for off in range(0, min(len(data), BLOCK * 200) - BLOCK, BLOCK):
-            cam.mu.mem_write(RING + wp, data[off:off + BLOCK])
-            wp = (wp + BLOCK) % RING_LEN
+        for off in range(0, min(len(data), BLOCK * 200) - block, block):
+            cam.mu.mem_write(RING + wp, data[off:off + block])
+            wp = (wp + block) % RING_LEN
             cam.put(DSP + 0x74, RING + wp)
             cam.call(tick, thumb=True)
             seen.append(cam.w(0x2AA01200))
@@ -283,6 +283,13 @@ class TcaudioTests(unittest.TestCase):
         cam.power_off()
         self.assertEqual(cam.w(0xC00DA154), 0x2102D10D)
         self.assertEqual(cam.w(0xC00DAA18), 0x20052102)
+
+    def test_ltc_on_both_channels_with_small_blocks_selects_the_mic(self):
+        # bloques de un octavo de trama: seis bloques no completan ninguna trama del otro canal
+        cam = self.boot()
+        self.feed(cam, self.both_channels(), block=BLOCK // 8)
+        self.assertEqual(cam.w(0xC00DA154), 0x2128D10D)
+        self.assertEqual(cam.w(0xC00DAA18), 0x20052128)
 
     def test_mic_is_left_when_the_ltc_goes(self):
         cam = self.boot()
