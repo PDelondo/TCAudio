@@ -89,7 +89,7 @@ With a Rode Wireless PRO and a test fp, except where noted:
 ### Generators
 
 - **Zoom M4:** use Internal. The Zoom carries TC in and TC out on the same jack (per its manual, tip is the input and ring the output), so it does not send TC on both channels: with a stereo cable, TC reaches the right channel and the left one goes to the Zoom's input. An echo of the TC leaks into that input (spikes at each edge), which the module cannot read as TC and treats as audio. On Auto that echo would be recorded on both channels.
-- **Deity TC-1 on A-OUT** (TC on channel 1, audio on the other) **does not support Internal:** they would mix. For the camera mic use L-OUT; for the Deity mic, A-OUT on Auto.
+- **Deity TC-1 on A-OUT** (TC on channel 1, audio on the other) **does not work on Internal.** To pass jack channel 1 alongside the mic, the camera can only sum it with channel 2; with the Deity audio on top, the TC cannot be read and does not lock. For the camera mic use L-OUT; for the Deity mic, A-OUT on Auto.
 - **To change generator,** turn the camera off, connect the new one and turn it back on. If you swap it with the camera on in Internal and TC does not lock, set Audio Input to Auto for a moment and back to Internal.
 
 ### The module
