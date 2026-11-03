@@ -25,19 +25,29 @@ The module adds two rows to the **Audio Recording > On** submenu. Their values s
 - **Audio Input:** Auto or Internal.
 - **Int+Ext Mics:** Off or On. It records, without TC, the camera mics on one channel and the jack on the other.
 
-| TC-IN | Audio Input | Int+Ext Mics | On the jack | Recorded |
-|---|---|---|---|---|
-| On | Auto | Not available | TC + audio | Jack audio on both channels |
-| On | Auto | Not available | TC on both channels | Internal mic on both channels |
-| On | Internal | Not available | TC + audio, TC on channel 2 (RWP) | Internal mic on both channels |
-| On | Internal | Not available | TC on both channels | Internal mic on both channels |
-| On | Internal | Not available | TC on channel 1, nothing on the other (Deity L-OUT) | Internal mic on both channels |
-| On | Any | Not available | Nothing | Internal mics in stereo |
-| Off | Auto | Off | Anything | Whatever enters the jack, as stock |
-| Off | Internal | Off | Anything | Internal mics in stereo, as if the jack were not there |
-| Off | Auto | On | Mic | Internal mics on channel 1 and the jack on channel 2 |
+### With TC-IN on: what to choose for your generator
 
-With TC-IN on, TC always comes from the jack, and Int+Ext Mics stays Off: if you turn it on, it returns by itself. With Int+Ext Mics On, Audio Input only allows Auto. Int+Ext Mics takes the right jack channel: check your mic arrives there, or use a cable with both channels bridged.
+On Auto the module tells the TC channel from the audio channel and records the audio. If the generator sends no audio (Deity L-OUT, Zoom M4), there is no audio to record: use Internal to take the camera's audio.
+
+| Generator | Audio Input | Recorded |
+|---|---|---|
+| TC on one channel and audio on the other (Rode Wireless PRO, Deity TC-1 on A-OUT) | Auto | The generator audio, on both channels |
+| TC only (Deity TC-1 on L-OUT, Zoom M4) | Internal | The internal mic, on both channels |
+| TC on both channels (Rode Wireless PRO in all-TC mode) | Auto or Internal | The internal mic, on both channels |
+| TC and audio, but you want the camera mic (Rode Wireless PRO) | Internal | The internal mic, on both channels |
+| Nothing connected | Any | The internal mics, in stereo |
+
+With TC-IN on, Int+Ext Mics stays Off: if you turn it on, it returns by itself.
+
+### With TC-IN off
+
+| Audio Input | Int+Ext Mics | Recorded |
+|---|---|---|
+| Auto | Off | Whatever enters the jack, as stock |
+| Internal | Off | The internal mics in stereo, as if the jack were not there |
+| Auto | On | The internal mics on channel 1 and the jack on channel 2 |
+
+With Int+Ext Mics On, Audio Input only allows Auto. Int+Ext Mics takes the right jack channel: check your mic arrives there, or use a cable with both channels bridged.
 
 ## Also
 
@@ -51,11 +61,11 @@ With TC-IN on, TC always comes from the jack, and Int+Ext Mics stays Off: if you
 
 - SIGMA fp with firmware **Ver.5.02**. It is the only one tested; the module uses fixed addresses for that version. The fp L has not been tested.
 - fpSup **Loader v4**, with SupManager.
-- A TC generator. If it also sends audio on the other channel, that audio is recorded; if not, the camera mic can be recorded. Tested with the Rode Wireless PRO, the Deity TC-1 and the Zoom M4 MicTrack, which sends LTC only.
+- A TC generator. Tested with the Rode Wireless PRO, the Deity TC-1 and the Zoom M4 MicTrak.
 
 ## Installation
 
-1. Copy `TCAudio_v1.2.0.BIN` to the `fpSup` folder on the card.
+1. Copy `TCAudio_v1.2.1.BIN` to the `fpSup` folder on the card.
 2. Boot the camera and check in SupManager that **TC Audio** is enabled.
 3. Enable TC-IN on the Time Code screen and leave **Audio Recording** ON.
 
@@ -70,23 +80,34 @@ With a Rode Wireless PRO and a test fp, except where noted:
 - A constant 1 frame between the camera audio and audio recorded on the RWP transmitters.
 - Lock verified at 23.98, 25 and 29.97 (drop-frame too), and rejected when rates do not match.
 - Deity TC-1 on A-OUT, with TC on channel 1: locks at its rates, including 59.94.
+- Rode Wireless PRO in all-TC mode, on Auto: records the internal mic.
+- Zoom M4 and Deity TC-1 on L-OUT, on Internal: record the internal mic.
+- 30 takes in a row in a test session, across all generators: continuous TC in the DNGs, no gaps.
 
 ## Known limitations
 
+### Generators
+
+- **Zoom M4:** use Internal. The Zoom carries TC in and TC out on the same jack (per its manual, tip is the input and ring the output), so it does not send TC on both channels: with a stereo cable, TC reaches the right channel and the left one goes to the Zoom's input. An echo of the TC leaks into that input (spikes at each edge), which the module cannot read as TC and treats as audio. On Auto that echo would be recorded on both channels.
+- **Deity TC-1:** to record the TC-1 mic, set it to A-OUT with Audio Input on Auto. To record the camera mic, set it to L-OUT with Audio Input on Internal.
+- **To change generator,** turn the camera off, connect the new one and turn it back on. If you swap it with the camera on, you may have reading problems.
+
+### The module
+
 - **Audio is mono while TC is present.** Recording has two channels and TC takes one.
-- **With TC on both channels and Audio Input on Auto,** the internal mic comes in on leaving the menu or pressing REC. Until then the meters may show the TC.
-- **The camera does not re-jam TC during a take.** Plugging the jack mid-take changes the audio; TC is corrected on the next take.
-- **Plugging or unplugging the jack while recording** causes about a second of transition, and LTC may be heard for an instant when plugging in.
+- **With TC on both channels, or on Internal,** the internal mic comes in when you press REC. Until then the meters may show the TC.
+- **Plugging or unplugging the jack while recording** does not hang the camera. There is about a second of transition, and LTC may be heard briefly when plugging in.
 - **The gain knob of the TC channel** can be moved but changes neither sound nor meter. It has not been tested at maximum. The audio channel's knob moves both meters.
-- **TC on channel 1 with audio on the other (Deity TC-1 on A-OUT) does not support Internal:** they would mix. For the camera mic use L-OUT; for the Deity mic, A-OUT in Auto.
-- **In Auto, with TC on one channel and nothing on the other** (Deity L-OUT), there is no sound to record: use Internal.
-- **To change generator,** it is best to turn the camera off and on.
 - **Switching Audio Recording from ON to OFF** leaves the meter showing signal until you record or pass through the menu.
+
+### The camera
+
+- **Drop-frame:** with TC-IN, the fp does not let you choose DF and seems not to accept it: it always counts non-drop (NDF). With a 29.97 DF generator, the DNG timecode runs 2 frames ahead at each minute change (except multiples of 10) within a take. Set the generator to NDF.
+- **The camera does not re-jam TC during a take.** Plugging the jack mid-take changes the audio; TC is corrected on the next take.
 
 ## Not tested
 
 - Other generators.
-- Drop-frame takes that cross a minute.
 - 48 and 50 fps with TC.
 
 ## Building

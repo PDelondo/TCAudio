@@ -38,7 +38,7 @@ El anillo de muestras va de `*0xC31D23F8` a `*0xC31D23F0`, lo escribe el DSP (pu
 - Una trama solo vale con 80 bits exactos entre dos sincronías.
 - La duración del medio bit se adapta, limitada a 23,98–30 fps.
 
-Se decodifican los dos canales hasta conocer el del TC. Después, el otro se revisa 6 bloques de cada 64 para ahorrar CPU.
+Con el jack y Audio Input en Auto se decodifican siempre los dos canales, para detectar el TC aunque llegue a un canal después de enganchar con el otro. Con el micro interno puesto (Internal, o Auto con TC por los dos canales), el otro canal se revisa 6 bloques de cada 64 para ahorrar CPU.
 
 ### Entrega del TC
 
@@ -61,7 +61,7 @@ Una media de 16 tramas separa 2002 de 2000, lo que una trama suelta no puede. Si
 
 ### Clonado y vúmetros
 
-El canal de audio se copia sobre el del LTC en el anillo antes de que lo tome el escritor del WAV. Se detiene si no llega LTC en unos 1,4 s, y no actúa si los dos canales llevan LTC.
+El canal de audio se copia sobre el del LTC en el anillo antes de que lo tome el escritor del WAV. Se detiene si no llega LTC en unos 1,4 s, y no actúa si los dos canales llevan LTC. Todo lo que no se decodifica como LTC cuenta como audio: un canal en silencio, con ruido o con el eco del Zoom M4 (ver Lecciones) se clona igual.
 
 El DSP mide los picos antes del clonado. La retrollamada de vúmetros `_c31cc81c` (`c01ff2b0(dB izq, dB der)`) se sustituye por `tca_meter`, que copia el valor del canal de audio. Solo afecta a la pantalla.
 
@@ -83,8 +83,10 @@ Grabación de audio es el ajuste de serie. Su valor efectivo es `ctx+0xE0`, que 
 
 ## Lecciones
 
-- **Todo puntero al módulo debe ir reclamado.** La versión 1.0.0 cambiaba `_c31cc81c` sin reclamarlo. Al apagar, el diario quitaba el tick pero no el puntero, y la cámara se colgaba con el LED rojo encendido (compatible con una llamada a memoria liberada, ver `HOOKS_AT_POWER_OFF.md` de fpSup). Reclamarlo después de `c00d6ec0`, para que el tick salga antes, lo arregló. Las pruebas grabando no llegan a ese camino.
+- **Todo puntero al módulo debe ir reclamado.** Una versión de desarrollo cambiaba `_c31cc81c` sin reclamarlo. Al apagar, el diario quitaba el tick pero no el puntero, y la cámara se colgaba con el LED rojo encendido (compatible con una llamada a memoria liberada, ver `HOOKS_AT_POWER_OFF.md` de fpSup). Reclamarlo después de `c00d6ec0`, para que el tick salga antes, lo arregló. Las pruebas grabando no llegan a ese camino.
 - **No llames a funciones del firmware desde la tarea del driver** si no estás seguro de sus argumentos.
+- **Escuchar un canal a ratos no basta para detectarlo.** Una trama solo vale con 80 bits entre dos sincronías, y una ventana corta puede no completar ninguna. Si el otro canal solo se revisaba a ratos y el TC le llegaba después del enganche, Auto no lo detectaba nunca. Lo reproduce `test_ltc_reaching_the_right_after_the_lock_selects_the_mic`.
+- **Señal no es TC.** El Zoom M4 lleva la entrada y la salida de TC en el mismo jack: punta entrada, anillo salida (manual del M4, p. 13). Con un cable estéreo, el canal izquierdo de la fp queda en la entrada del Zoom y recoge por diafonía capacitiva un eco del LTC del anillo: picos en cada flanco y casi nada entre ellos (C001_466, grabada con TC-IN apagado). El decodificador ve decenas de cruces falsos por bit y no saca ni una trama, así que el módulo lo trata como audio.
 
 ## Pruebas
 
@@ -94,4 +96,5 @@ Grabación de audio es el ajuste de serie. Su valor efectivo es `ctx+0xE0`, que 
 
 - Por qué una toma puede empezar con 2 fotogramas de diferencia si se graba justo tras enganchar. **Hipótesis:** el reajuste, que actúa como mucho cada segundo, aún no había actuado.
 - Mensaje `1474` en arranque en frío: es la clave del texto "Now Connecting" en `SYS_WarningMsg`. También sale sin TCAudio. **Hipótesis:** la resolución de textos en `C05E5B58`, que engancha el cargador.
-- Un valor para TC a la izquierda con audio a la derecha (Deity TC-1 A-OUT). No se ha encontrado.
+- Grabar el micro de la cámara con el Deity TC-1 en A-OUT (TC por el canal 1 y audio por el 2). Haría falta un valor del registro 5 del códec que junte los micros con solo el canal 1 del jack, y no se ha encontrado: 0x28 corta el canal 1 y 0x29 lo suma con el 2.
+- Drop-frame con TC-IN: la cámara cuenta sin drop-frame aunque el generador vaya en DF (C001_435: 17:20:59:29 → 17:21:00:00). No se ha buscado en el firmware dónde se decide.

@@ -103,7 +103,7 @@ typedef int16_t s16;
 #define SPAN_30       1700u             /* por debajo, 29,97 o 30 */
 #define SPAN_25       1960u             /* por debajo, 25 */
 #define BURST         6u                /* muestras por ráfaga: seis registros libres */
-#define OTHER_PERIOD  0x3Fu             /* el otro canal: 6 bloques (dos tramas) cada 64, ~1,4 s */
+#define OTHER_PERIOD  0x3Fu             /* el otro canal, con el micro o en Internal: 6 de cada 64 */
 #define OTHER_BLOCKS  6u
 #define FRAME_SAMPLES 2002u             /* muestras por fotograma a 23,976 fps, hasta medirlas */
 
@@ -241,8 +241,10 @@ static void take(struct tca *t, u32 from, u32 to)
     t->cloning = clone;
 
     /* el anillo no pasa por caché: se lee y se escribe a ráfagas de BURST muestras, que ocupan el
-     * bus mucho menos que una a una; el otro canal solo se decodifica a ratos */
-    u32 both = !t->known || (t->ticks & OTHER_PERIOD) < OTHER_BLOCKS;
+     * bus mucho menos que una a una. En Auto con el jack se decodifican siempre los dos canales:
+     * a ratos, una ventana corta puede no completar ninguna trama y el LTC por los dos canales
+     * no se detecta nunca. Con el micro puesto o en Internal, el otro canal solo a ratos. */
+    u32 both = !t->known || (!t->forced && t->input == IN_JACK) || (t->ticks & OTHER_PERIOD) < OTHER_BLOCKS;
     u32 buf[BURST];
 
     for (u32 a = from; a < to; a += BURST * 4u) {

@@ -19,7 +19,7 @@ FPUI = REPO / 'fpsup-ui'
 sys.path.insert(0, str(REPO / 'loader-v4'))
 import build_v4 as B4      # noqa: E402
 
-NAME = 'TCAudio_v1.2.0.BIN'
+NAME = 'TCAudio_v1.2.1.BIN'
 DISPLAY = 'TC Audio'
 SUP_ID = 'TCAU'
 
