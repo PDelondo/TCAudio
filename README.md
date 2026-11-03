@@ -1,0 +1,105 @@
+# TCAudio
+
+**TC-IN y audio a la vez en la SIGMA fp.**
+
+![TC externo enganchado, grabando, con audio en los dos vúmetros](docs/tcaudio-rec.png)
+
+De serie la fp no puede grabar audio y sincronizarse por Time Code (TC) al mismo tiempo. Al activar la entrada de código de tiempo (TC-IN) la fp inhabilita la grabación de audio y crea DNGs sin pista WAV. TCAudio es un módulo para [fpSup](https://github.com/ijigen/fpSup) que permite tener las dos cosas: el video con TC sincronizado y un WAV con sonido entrante en la misma toma. TCAudio también permite grabar en canales distintos con micros externos y con los de la cámara simultáneamente.
+
+*[English version](README.en.md)*
+
+## Qué hace
+
+Con el Código de Tiempo externo (TC-IN) activo, la fila de serie **Grabación de audio** no se desactiva como hace el firmware original. Funciona de este modo:
+
+| Grabación de audio | Resultado |
+|---|---|
+| **ON**, con TC en el jack | El TC del generador se graba en el video y en el WAV. El sonido del otro canal (el micrófono o la fuente conectada) se graba en ambos canales del WAV: desaparece el ruido de LTC. |
+| **ON**, jack desconectado | Se graba el audio de los micros de la cámara, en estéreo. La cámara sigue contando el TC por su cuenta, y el indicador EX parpadea en rojo para avisar de que no recibe TC externo. |
+| **OFF** | Funcionamiento TC-IN de serie, sin audio. |
+
+## Las filas Audio Input e Int+Ext Mics
+
+El módulo añade dos filas en el submenú de **Grabación de audio > On**. Los valores se conservan al reiniciar, y los cambios se aplican al momento.
+
+- **Audio Input:** Auto o Internal.
+- **Int+Ext Mics:** Off u On. Sirve para grabar sin TC los micros de la cámara en un canal y el jack en el otro.
+
+| TC-IN | Audio Input | Int+Ext Mics | En el jack | Se graba |
+|---|---|---|---|---|
+| Activo | Auto | No disponible | TC + audio | Audio del jack en los dos canales |
+| Activo | Auto | No disponible | TC en los dos canales | Micro interno en los dos canales |
+| Activo | Internal | No disponible | TC + audio, con TC por el canal 2 (RWP) | Micro interno en los dos canales |
+| Activo | Internal | No disponible | TC en los dos canales | Micro interno en los dos canales |
+| Activo | Internal | No disponible | TC por el canal 1 y nada en el otro (Deity L-OUT) | Micro interno en los dos canales |
+| Activo | Cualquiera | No disponible | Nada | Micros internos en estéreo |
+| Apagado | Auto | Off | Lo que sea | Lo que entra por el jack, como de serie |
+| Apagado | Internal | Off | Lo que sea | Micros internos en estéreo, como si el jack no estuviera |
+| Apagado | Auto | On | Micro | Micros internos en el canal 1 y el jack en el canal 2 |
+
+Con TC-IN activo, el TC siempre viene del jack, y Int+Ext Mics se queda en Off: si la activas, vuelve sola. Con Int+Ext Mics en On, Audio Input solo admite Auto. Int+Ext Mics toma el canal derecho del jack: comprueba que tu micro llega por ahí, o usa un cable con los dos canales puenteados.
+
+## Además
+
+- Detecta en qué canal llega el TC y copia el sonido del otro canal sobre él antes de grabar el WAV, de modo que el fichero lleva el mismo audio en los dos canales y no se oye el LTC.
+- Lee el TC con la ganancia de ese canal muy baja (probado a -36).
+- Muestra el nivel del audio en los dos vúmetros, en vez del TC.
+- Solo engancha si el TC va a la misma velocidad que la cámara, como de serie. Distingue también 23,98 de 24 y 29,97 de 30.
+- Afina el reajuste del TC con la cámara parada: reajusta con 1 fotograma de error en lugar de 2. Esto también se aplica con la grabación de audio en OFF.
+
+## Requisitos
+
+- SIGMA fp con firmware **Ver.5.02**. Es el único probado; el módulo usa direcciones fijas de esa versión. No se ha probado en la fp L.
+- **Loader v4** de fpSup, con SupManager.
+- Un generador de TC. Si además manda audio por el otro canal, se graba ese audio; si no, se puede grabar el micro de la cámara. Probado con el Rode Wireless PRO, el Deity TC-1 y el Zoom M4 MicTrack, que solo manda LTC.
+
+## Instalación
+
+1. Copia `TCAudio_v1.2.0.BIN` en la carpeta `fpSup` de la tarjeta.
+2. Arranca la cámara y comprueba en SupManager que **TC Audio** está activo.
+3. Activa TC-IN en la pantalla Time Code y deja **Grabación de audio** en ON.
+
+Para quitarlo, desactívalo en SupManager o borra el fichero. Espera unos segundos tras enganchar antes de grabar.
+
+## Resultados medidos
+
+Con un Rode Wireless PRO y una fp de pruebas, salvo donde se indica:
+
+- Toma de **29 min 39 s** a 23,98 fps (42.657 fotogramas): ningún salto de TC, ningún fotograma perdido, sin deriva respecto al reloj del generador; +2 fotogramas constantes en esa toma, grabada justo después de enganchar.
+- Cuatro tomas cortas: entre 0 y +1 fotograma aproximadamente.
+- 1 fotograma constante entre el audio de la cámara y el grabado en los transmisores del RWP.
+- Enganche comprobado a 23,98, 25 y 29,97 (también drop-frame), y rechazo con velocidades que no coinciden.
+- Deity TC-1 en A-OUT, con el TC por el canal 1: engancha en sus velocidades, incluida 59,94.
+
+## Limitaciones conocidas
+
+- **El audio es mono cuando hay TC.** La grabación tiene dos canales y uno lo ocupa el TC.
+- **Con TC en los dos canales y Audio Input en Auto,** el micro interno entra al salir del menú o al pulsar REC. Hasta entonces los vúmetros pueden mostrar el TC.
+- **La cámara no reajusta el TC durante una toma.** Si enchufas el jack en plena toma, cambia el audio; el TC se corrige en la toma siguiente.
+- **Al enchufar o quitar el jack grabando** hay cerca de un segundo de transición, y al enchufar se puede oír LTC un instante.
+- **La perilla de ganancia del canal del TC** se puede mover, pero no cambia ni el sonido ni el vúmetro. No se ha probado al máximo. La del canal de audio mueve los dos vúmetros.
+- **TC por el canal 1 con audio en el otro (Deity TC-1 en A-OUT) no admite Internal:** se mezclarían. Para el micro de la cámara usa L-OUT; para el micro del Deity, A-OUT en Auto.
+- **En Auto, con TC por un canal y nada en el otro** (Deity L-OUT), no hay sonido que grabar: usa Internal.
+- **Para cambiar de generador,** se recomienda apagar y encender la cámara.
+- **Si cambias Grabación de audio de ON a OFF** el vúmetro sigue mostrando señal hasta grabar o pasar por el menú.
+
+## Sin probar
+
+- Otros generadores.
+- Tomas drop-frame que crucen un minuto.
+- 48 y 50 fps con TC.
+
+## Compilar
+
+```bash
+FPSUP_REPO=/ruta/a/fpSup python3 -B build_tcaudio.py --out salida
+FPSUP_REPO=/ruta/a/fpSup python3 -B -m unittest test_tcaudio
+```
+
+La compilación y las pruebas necesitan el firmware 5.02 extraído por tu cuenta: la fila se compone contra la página de menú original, y las pruebas usan el emulador de fpSup. El detalle está en [docs/TECHNICAL.md](docs/TECHNICAL.md).
+
+## Licencia y autoría
+
+GPL-3.0-or-later. Autor: Pablo Sánchez. Código escrito por Claude (Anthropic). Mira [NOTICE](NOTICE).
+
+Este proyecto no está afiliado a SIGMA ni a fpSup. Modifica el firmware en la RAM de la cámara: úsalo bajo tu responsabilidad.

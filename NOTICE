@@ -1,0 +1,19 @@
+TCAudio
+Copyright (C) 2026 Pablo Sánchez. Code written by Claude (Anthropic).
+Licensed under the GNU General Public License, version 3 or later (see LICENSE).
+
+TCAudio is a module ("sup") for fpSup Loader v4 by bei (ijigen), and is built
+against its headers and build tools. It is a separate project: it is not part
+of fpSup and is not endorsed by its author.
+
+This project is not affiliated with, endorsed by, or supported by SIGMA
+Corporation. "SIGMA" and "fp" are trade names of SIGMA Corporation. No firmware
+image is included. Memory addresses and register values in this repository are
+factual observations of firmware Ver.5.02. The built module carries about 6 KB
+of menu records taken from the stock page to add its two rows, the same
+technique used by other fpSup modules.
+
+menu/ derives from build scripts in fpSup by bei (GPL-3.0).
+
+Use it at your own risk: it modifies the running firmware in the camera's RAM.
+There is no warranty.
