@@ -84,7 +84,7 @@ With a Rode Wireless PRO and a test fp, except where noted:
 - **The gain knob of the TC channel** can be moved but changes neither sound nor meter. It has not been tested at maximum. The audio channel's knob moves both meters.
 - **TC on channel 1 with audio on the other (Deity TC-1 on A-OUT) does not support Internal:** they would mix. For the camera mic use L-OUT; for the Deity mic, A-OUT in Auto.
 - **In Auto, with TC on one channel and nothing on the other** (Deity L-OUT), there is no sound to record: use Internal.
-- **To change generator,** turn the camera off, connect the new one and turn it back on. If you swap it with the camera on, it may not see the new generator's TC.
+- **To change generator,** turn the camera off, connect the new one and turn it back on. If you swap it with the camera on in Internal and TC does not lock, set Audio Input to Auto for a moment and back to Internal.
 - **Drop-frame (a limitation of the fp, not of the module):** with TC-IN the camera does not let you choose DF and seems not to accept it: it always counts non-drop (NDF). With a 29.97 DF generator, the DNG timecode runs 2 frames ahead at each minute change (except multiples of 10) within a take. Set the generator to NDF.
 - **Switching Audio Recording from ON to OFF** leaves the meter showing signal until you record or pass through the menu.
 

@@ -84,7 +84,7 @@ Con un Rode Wireless PRO y una fp de pruebas, salvo donde se indica:
 - **La perilla de ganancia del canal del TC** se puede mover, pero no cambia ni el sonido ni el vúmetro. No se ha probado al máximo. La del canal de audio mueve los dos vúmetros.
 - **TC por el canal 1 con audio en el otro (Deity TC-1 en A-OUT) no admite Internal:** se mezclarían. Para el micro de la cámara usa L-OUT; para el micro del Deity, A-OUT en Auto.
 - **En Auto, con TC por un canal y nada en el otro** (Deity L-OUT), no hay sonido que grabar: usa Internal.
-- **Para cambiar de generador,** apaga la cámara, conecta el nuevo y vuelve a encenderla. Si lo cambias con la cámara encendida, puede no ver el TC del nuevo.
+- **Para cambiar de generador,** apaga la cámara, conecta el nuevo y vuelve a encenderla. Si lo cambias con la cámara encendida en Internal y el TC no engancha, pon Audio Input en Auto un momento y vuelve a Internal.
 - **Drop-frame (limitación de la fp, no del módulo):** con TC-IN la cámara no deja elegir DF y parece no aceptarlo: cuenta siempre sin drop-frame (NDF). Con un generador a 29,97 DF, el TC de los DNG se adelanta 2 fotogramas en cada cambio de minuto (salvo los múltiplos de 10) dentro de una toma. Pon el generador en NDF.
 - **Si cambias Grabación de audio de ON a OFF** el vúmetro sigue mostrando señal hasta grabar o pasar por el menú.
 
