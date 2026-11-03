@@ -78,7 +78,7 @@ With a Rode Wireless PRO and a test fp, except where noted:
 
 - **Audio is mono while TC is present.** Recording has two channels and TC takes one.
 - **With TC on both channels and Audio Input on Auto,** the internal mic comes in when you press REC. Until then the meters may show the TC. Internal behaves the same.
-- **Zoom M4: use Internal.** The Zoom carries TC in and TC out on the same cable, one contact each, so it does not send TC on both channels: one carries the TC and the other is its input. An echo of the TC leaks into that input (spikes at each edge), which the module cannot read as TC and treats as audio. On Auto that echo would be recorded on both channels. We measured the echo in the WAV.
+- **Zoom M4: use Internal.** The Zoom carries TC in and TC out on the same jack (per its manual, tip is the input and ring the output), so it does not send TC on both channels: with a stereo cable, TC reaches the right channel and the left one goes to the Zoom's input. An echo of the TC leaks into that input (spikes at each edge), which the module cannot read as TC and treats as audio. On Auto that echo would be recorded on both channels. We measured the echo in the WAV.
 - **The camera does not re-jam TC during a take.** Plugging the jack mid-take changes the audio; TC is corrected on the next take.
 - **Plugging or unplugging the jack while recording** does not hang the camera. There is about a second of transition, and LTC may be heard briefly when plugging in.
 - **The gain knob of the TC channel** can be moved but changes neither sound nor meter. It has not been tested at maximum. The audio channel's knob moves both meters.
