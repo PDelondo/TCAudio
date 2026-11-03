@@ -25,21 +25,29 @@ El módulo añade dos filas en el submenú de **Grabación de audio > On**. Los 
 - **Audio Input:** Auto o Internal.
 - **Int+Ext Mics:** Off u On. Sirve para grabar sin TC los micros de la cámara en un canal y el jack en el otro.
 
-| TC-IN | Audio Input | Int+Ext Mics | En el jack | Se graba |
-|---|---|---|---|---|
-| Activo | Auto | No disponible | TC + audio | Audio del jack en los dos canales |
-| Activo | Auto | No disponible | TC en los dos canales (RWP en modo todo TC) | Micro interno en los dos canales |
-| Activo | Internal | No disponible | TC + audio, con TC por el canal 2 (RWP) | Micro interno en los dos canales |
-| Activo | Internal | No disponible | TC en los dos canales | Micro interno en los dos canales |
-| Activo | Internal | No disponible | TC por el canal 1 y nada en el otro (Deity L-OUT) | Micro interno en los dos canales |
-| Activo | Cualquiera | No disponible | Nada | Micros internos en estéreo |
-| Apagado | Auto | Off | Lo que sea | Lo que entra por el jack, como de serie |
-| Apagado | Internal | Off | Lo que sea | Micros internos en estéreo, como si el jack no estuviera |
-| Apagado | Auto | On | Micro | Micros internos en el canal 1 y el jack en el canal 2 |
+### Con TC-IN activo: qué elegir según el generador
 
-**Regla para elegir:** en Auto el módulo distingue el canal del TC del de audio y graba el audio. Si el generador no manda audio (Deity L-OUT, Zoom M4), no hay audio que grabar: usa Internal para tomar el audio de la cámara.
+En Auto el módulo distingue el canal del TC del de audio y graba el audio. Si el generador no manda audio (Deity L-OUT, Zoom M4), no hay audio que grabar: usa Internal para tomar el audio de la cámara.
 
-Con TC-IN activo, el TC siempre viene del jack, y Int+Ext Mics se queda en Off: si la activas, vuelve sola. Con Int+Ext Mics en On, Audio Input solo admite Auto. Int+Ext Mics toma el canal derecho del jack: comprueba que tu micro llega por ahí, o usa un cable con los dos canales puenteados.
+| Generador | Audio Input | Se graba |
+|---|---|---|
+| TC por un canal y audio por el otro (Rode Wireless PRO, Deity TC-1 en A-OUT) | Auto | El audio del generador, en los dos canales |
+| Solo TC (Deity TC-1 en L-OUT, Zoom M4) | Internal | El micro interno, en los dos canales |
+| TC por los dos canales (Rode Wireless PRO en modo todo TC) | Auto o Internal | El micro interno, en los dos canales |
+| TC y audio, pero quieres el micro de la cámara (Rode Wireless PRO) | Internal | El micro interno, en los dos canales |
+| Nada conectado | Cualquiera | Los micros internos, en estéreo |
+
+Con TC-IN activo, Int+Ext Mics se queda en Off: si la activas, vuelve sola.
+
+### Con TC-IN apagado
+
+| Audio Input | Int+Ext Mics | Se graba |
+|---|---|---|
+| Auto | Off | Lo que entra por el jack, como de serie |
+| Internal | Off | Los micros internos en estéreo, como si el jack no estuviera |
+| Auto | On | Los micros internos en el canal 1 y el jack en el canal 2 |
+
+Con Int+Ext Mics en On, Audio Input solo admite Auto. Int+Ext Mics toma el canal derecho del jack: comprueba que tu micro llega por ahí, o usa un cable con los dos canales puenteados.
 
 ## Además
 
@@ -53,11 +61,11 @@ Con TC-IN activo, el TC siempre viene del jack, y Int+Ext Mics se queda en Off: 
 
 - SIGMA fp con firmware **Ver.5.02**. Es el único probado; el módulo usa direcciones fijas de esa versión. No se ha probado en la fp L.
 - **Loader v4** de fpSup, con SupManager.
-- Un generador de TC. Si además manda audio por el otro canal, se graba ese audio; si no, se puede grabar el micro de la cámara. Probado con el Rode Wireless PRO, el Deity TC-1 y el Zoom M4 MicTrack, que solo manda LTC.
+- Un generador de TC. Probado con el Rode Wireless PRO, el Deity TC-1 y el Zoom M4 MicTrak.
 
 ## Instalación
 
-1. Copia `TCAudio_v1.2.0.BIN` en la carpeta `fpSup` de la tarjeta.
+1. Copia `TCAudio_v1.2.1.BIN` en la carpeta `fpSup` de la tarjeta.
 2. Arranca la cámara y comprueba en SupManager que **TC Audio** está activo.
 3. Activa TC-IN en la pantalla Time Code y deja **Grabación de audio** en ON.
 
@@ -72,21 +80,30 @@ Con un Rode Wireless PRO y una fp de pruebas, salvo donde se indica:
 - 1 fotograma constante entre el audio de la cámara y el grabado en los transmisores del RWP.
 - Enganche comprobado a 23,98, 25 y 29,97 (también drop-frame), y rechazo con velocidades que no coinciden.
 - Deity TC-1 en A-OUT, con el TC por el canal 1: engancha en sus velocidades, incluida 59,94.
-- 1.2.1: RWP en modo todo TC con Audio Input en Auto: graba el micro interno (con la 1.2.0 grababa el LTC).
+- Rode Wireless PRO en modo todo TC, en Auto: graba el micro interno.
+- Zoom M4 y Deity TC-1 en L-OUT, en Internal: graban el micro interno.
+- 30 tomas seguidas en una batería de pruebas, con todos los generadores: TC continuo en los DNG, sin huecos.
 
 ## Limitaciones conocidas
 
+### De los generadores
+
+- **Zoom M4:** usa Internal. El Zoom lleva la entrada y la salida de TC en el mismo jack (según su manual, la punta es la entrada y el anillo la salida), así que no manda TC por los dos canales: con un cable estéreo, el TC llega al canal derecho y el izquierdo va a la entrada del Zoom. Por esa entrada se cuela un eco del TC (picos en cada flanco) que el módulo no puede leer como TC y trata como audio. En Auto se grabaría ese eco en los dos canales.
+- **Deity TC-1 en A-OUT** (TC por el canal 1 y audio por el otro) **no admite Internal:** se mezclarían. Para el micro de la cámara usa L-OUT; para el micro del Deity, A-OUT en Auto.
+- **Para cambiar de generador,** apaga la cámara, conecta el nuevo y vuelve a encenderla. Si lo cambias con la cámara encendida en Internal y el TC no engancha, pon Audio Input en Auto un momento y vuelve a Internal.
+
+### Del módulo
+
 - **El audio es mono cuando hay TC.** La grabación tiene dos canales y uno lo ocupa el TC.
-- **Con TC en los dos canales y Audio Input en Auto,** el micro interno entra al pulsar REC. Hasta entonces los vúmetros pueden mostrar el TC. Con Internal pasa lo mismo.
-- **Zoom M4: usa Internal.** El Zoom lleva la entrada y la salida de TC en el mismo jack (según su manual, la punta es la entrada y el anillo la salida), así que no manda TC por los dos canales: con un cable estéreo, el TC llega al canal derecho y el izquierdo va a la entrada del Zoom. Por esa entrada se cuela un eco del TC (picos en cada flanco) que el módulo no puede leer como TC y trata como audio. En Auto se grabaría ese eco en los dos canales. El eco lo hemos medido en el WAV.
-- **La cámara no reajusta el TC durante una toma.** Si enchufas el jack en plena toma, cambia el audio; el TC se corrige en la toma siguiente.
+- **Con TC por los dos canales, o en Internal,** el micro interno entra al pulsar REC. Hasta entonces los vúmetros pueden mostrar el TC.
 - **Al enchufar o quitar el jack grabando** la cámara no se cuelga. Hay cerca de un segundo de transición, y al enchufar se puede oír LTC un instante.
 - **La perilla de ganancia del canal del TC** se puede mover, pero no cambia ni el sonido ni el vúmetro. No se ha probado al máximo. La del canal de audio mueve los dos vúmetros.
-- **TC por el canal 1 con audio en el otro (Deity TC-1 en A-OUT) no admite Internal:** se mezclarían. Para el micro de la cámara usa L-OUT; para el micro del Deity, A-OUT en Auto.
-- **En Auto, con TC por un canal y nada en el otro** (Deity L-OUT), no hay sonido que grabar: usa Internal.
-- **Para cambiar de generador,** apaga la cámara, conecta el nuevo y vuelve a encenderla. Si lo cambias con la cámara encendida en Internal y el TC no engancha, pon Audio Input en Auto un momento y vuelve a Internal.
-- **Drop-frame (limitación de la fp, no del módulo):** con TC-IN la cámara no deja elegir DF y parece no aceptarlo: cuenta siempre sin drop-frame (NDF). Con un generador a 29,97 DF, el TC de los DNG se adelanta 2 fotogramas en cada cambio de minuto (salvo los múltiplos de 10) dentro de una toma. Pon el generador en NDF.
-- **Si cambias Grabación de audio de ON a OFF** el vúmetro sigue mostrando señal hasta grabar o pasar por el menú.
+- **Si cambias Grabación de audio de ON a OFF,** el vúmetro sigue mostrando señal hasta grabar o pasar por el menú.
+
+### De la cámara
+
+- **Drop-frame:** con TC-IN, la fp no deja elegir DF y parece no aceptarlo: cuenta siempre sin drop-frame (NDF). Con un generador a 29,97 DF, el TC de los DNG se adelanta 2 fotogramas en cada cambio de minuto (salvo los múltiplos de 10) dentro de una toma. Pon el generador en NDF.
+- **La cámara no reajusta el TC durante una toma.** Si enchufas el jack en plena toma, cambia el audio; el TC se corrige en la toma siguiente.
 
 ## Sin probar
 

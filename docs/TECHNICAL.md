@@ -38,7 +38,7 @@ The sample ring runs from `*0xC31D23F8` to `*0xC31D23F0`, written by the DSP (wr
 - A frame counts only with exactly 80 bits between two sync words.
 - The half-bit length adapts, limited to 23.98–30 fps.
 
-Both channels are decoded until the TC channel is known. After that the other channel is checked for 6 blocks in every 64 to save CPU.
+With the jack and Audio Input on Auto, both channels are always decoded, so TC is found even when it reaches one channel after locking on the other. With the internal mic in use (Internal, or Auto with TC on both channels), the other channel is checked for 6 blocks in every 64 to save CPU.
 
 ### Delivering the timecode
 
@@ -61,7 +61,7 @@ A 16-frame average separates 2002 from 2000, which a single frame cannot. On mis
 
 ### Cloning and meters
 
-The audio channel is copied over the LTC channel in the ring before the WAV writer takes it. It stops if no LTC has arrived for about 1.4 s, and does not run if both channels carry LTC.
+The audio channel is copied over the LTC channel in the ring before the WAV writer takes it. It stops if no LTC has arrived for about 1.4 s, and does not run if both channels carry LTC. Anything that does not decode as LTC counts as audio: a channel with silence, noise or the Zoom M4 echo (see Lessons) is cloned all the same.
 
 The DSP measures peaks before cloning. The meter callback at `_c31cc81c` (`c01ff2b0(dB left, dB right)`) is replaced by `tca_meter`, which copies the audio channel's value. It only affects the display.
 
@@ -83,7 +83,7 @@ Audio Recording is the stock setting. Its effective value is `ctx+0xE0`, updated
 
 ## Lessons
 
-- **Every pointer into the module must be claimed.** Version 1.0.0 set `_c31cc81c` without a claim. At power-off the journal removed the tick but not the pointer, and the camera hung with the red LED on (consistent with a call into released memory, see fpSup's `HOOKS_AT_POWER_OFF.md`). Claiming it after `c00d6ec0`, so the tick is gone first, fixed it. Recording tests do not reach this path.
+- **Every pointer into the module must be claimed.** A development version set `_c31cc81c` without a claim. At power-off the journal removed the tick but not the pointer, and the camera hung with the red LED on (consistent with a call into released memory, see fpSup's `HOOKS_AT_POWER_OFF.md`). Claiming it after `c00d6ec0`, so the tick is gone first, fixed it. Recording tests do not reach this path.
 - **Do not call firmware functions from the driver task** unless you are sure of their arguments.
 
 ## Tests
