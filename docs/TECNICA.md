@@ -96,5 +96,5 @@ Grabación de audio es el ajuste de serie. Su valor efectivo es `ctx+0xE0`, que 
 
 - Por qué una toma puede empezar con 2 fotogramas de diferencia si se graba justo tras enganchar. **Hipótesis:** el reajuste, que actúa como mucho cada segundo, aún no había actuado.
 - Mensaje `1474` en arranque en frío: es la clave del texto "Now Connecting" en `SYS_WarningMsg`. También sale sin TCAudio. **Hipótesis:** la resolución de textos en `C05E5B58`, que engancha el cargador.
-- Un valor para TC a la izquierda con audio a la derecha (Deity TC-1 A-OUT). No se ha encontrado.
+- Grabar el micro de la cámara con el Deity TC-1 en A-OUT (TC por el canal 1 y audio por el 2). Haría falta un valor del registro 5 del códec que junte los micros con solo el canal 1 del jack, y no se ha encontrado: 0x28 corta el canal 1 y 0x29 lo suma con el 2.
 - Drop-frame con TC-IN: la cámara cuenta sin drop-frame aunque el generador vaya en DF (C001_435: 17:20:59:29 → 17:21:00:00). No se ha buscado en el firmware dónde se decide.

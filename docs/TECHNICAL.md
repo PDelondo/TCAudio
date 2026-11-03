@@ -94,4 +94,4 @@ Audio Recording is the stock setting. Its effective value is `ctx+0xE0`, updated
 
 - Why a short take can start 2 frames off when recording right after locking. **Hypothesis:** the re-jam, which runs at most about once per second, had not acted yet.
 - Message `1474` on cold boot: it is the text key of "Now Connecting" in `SYS_WarningMsg`. It also appears without TCAudio. **Hypothesis:** the text lookup at `C05E5B58`, which the loader hooks.
-- A value for TC on the left with audio on the right (Deity TC-1 A-OUT). None found.
+- Recording the camera mic with the Deity TC-1 on A-OUT (TC on channel 1, audio on channel 2). It would need a codec register 5 value that pairs the mics with jack channel 1 alone, and none has been found: 0x28 cuts channel 1 and 0x29 sums it with channel 2.
