@@ -499,7 +499,7 @@ static u32 tca_tick(void)
         if (!jack_in())
             t->latch = 0;                               /* sin clavija: se olvida la caja */
         else if (B8(STATE_REMOTE))
-            t->latch = 1;                               /* la caja se vio: aguanta el parpadeo al encender el mando *
+            t->latch = 1;                               /* la caja se vio: aguanta el parpadeo al encender el mando */
         want = t->latch;                /* también en Internal: TCAudio elige la entrada en el códec desde el
                                          * modo jack (con TC, micros en un canal y TC en el otro) */
         if (want != t->force_mic) {
