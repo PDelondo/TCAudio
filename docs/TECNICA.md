@@ -21,6 +21,8 @@ El DSP fija su salida al arrancar. Quitar el bit en marcha enciende los medidore
 | `0xC00CEB94` | `mov r3,#2` → `mov r3,#1` | Reajusta con 1 fotograma de error |
 | `0xC00DA154`, `0xC00DAA18` | `movs r1,#2` → otro valor, cuando hace falta | Micro interno con jack |
 | `0xC00DA154`, `0xC00DAA14` | `bne` → `b`, cuando hace falta | Micros en estéreo con TC-IN apagado |
+| `0xC00DA1B0`, `0xC00DAA74` | `movs r1,#0x24` → `#0x29`, cuando hace falta | Internal con el TC por la izquierda, por la rama INT (1.3.0) |
+| `0xC3425BDD` | byte de forzado del detector del jack a 1, con la caja (datos, no código) | Micro y mando por el mismo jack (1.4.0) |
 | `0xC00D6EC0` | salto a `tca_tick` | Se ejecuta una vez por bloque en la tarea del driver |
 | `0xC31CC81C` | puntero a `tca_meter` | Retrollamada de vúmetros, puesta en marcha |
 
@@ -75,17 +77,50 @@ La ruta de entrada es el registro 5 del códec, escrito con `c00daf70(reg, val)`
 | 0x29 | Ambos micros | Las dos entradas del jack sumadas | C001_385: 388 de 391 tramas con la derecha vacía; C001_386: inservible con audio en ella |
 | 0x2B | Mezcla | Mezcla | C001_390: inservible |
 
-El módulo escribe el valor en los dos sitios y limpia las cachés, desde la tarea del driver, con las rutinas del firmware. Auto usa 0x28 si llega LTC por los dos canales. Internal usa 0x28, o 0x29 si el TC se vio a la izquierda. El canal del TC pasa a ser el derecho y se clona el izquierdo sobre él. Con TC-IN apagado e Internal, los dos `bne` saltan a la rama del micro interno: estéreo y jack desconectado (C001_399). Int+Ext Mics usa 0x28 con TC-IN apagado (C001_401). Al cambiar una fila, el módulo escribe los sitios, pone a cero la palabra del gestor de micro y llama a `SetMic(1)` desde el hilo de la interfaz, y la cámara reescribe el códec como al enchufar un jack. Auto con TC en los dos canales no nace de una fila, así que rige la próxima vez que la cámara escribe el registro. Las dos filas se guardan en el fichero del módulo (`tca_rec`), nunca en los ajustes de la cámara. Con TC-IN activo, Int+Ext Mics se devuelve a Off con `0xC0593F30`. Las filas de serie se ponen en gris de forma nativa; la fila copiada no tiene esa conexión, y enlazar `SelectLock` con una variable no funcionó. El modelo del códec no se ha identificado.
+El módulo escribe el valor en los dos sitios y limpia las cachés, desde la tarea del driver, con las rutinas del firmware. Auto usa 0x28 si llega LTC por los dos canales. Internal usa 0x28, o 0x29 si el TC se vio a la izquierda. Desde la 1.3.0, 0x29 va por la **rama INT** de las dos funciones (la del último caso, que escribe 0x24 y deja el registro 10 sin el bit 0x20): se desvía la cámara a esa rama y se cambia su constante `movs r1,#0x24` por 0x29 (media palabra alta de `0xC00DA1B0` y baja de `0xC00DAA74`). Así el jack derecho no entra y el Deity TC-1 en A-OUT (TC por el 1, audio por el 2) puede grabar el micro de la cámara. El canal del TC pasa a ser el derecho y se clona el izquierdo sobre él. Con TC-IN apagado e Internal, los dos `bne` saltan a la rama del micro interno: estéreo y jack desconectado (C001_399). Int+Ext Mics usa 0x28 con TC-IN apagado (C001_401). Al cambiar una fila, el módulo escribe los sitios, pone a cero la palabra del gestor de micro y llama a `SetMic(1)` desde el hilo de la interfaz, y la cámara reescribe el códec como al enchufar un jack. Auto con TC en los dos canales no nace de una fila, así que rige la próxima vez que la cámara escribe el registro. Las dos filas se guardan en el fichero del módulo (`tca_rec`), nunca en los ajustes de la cámara. Con TC-IN activo, Int+Ext Mics se devuelve a Off con `0xC0593F30`. Las filas de serie se ponen en gris de forma nativa; la fila copiada no tiene esa conexión, y enlazar `SelectLock` con una variable no funcionó. El modelo del códec no se ha identificado.
 
 ### Ajuste de audio
 
 Grabación de audio es el ajuste de serie. Su valor efectivo es `ctx+0xE0`, que se actualiza al salir del menú. En un arranque en frío con TC-IN, la copia del objeto del ajuste (`0xC31ACC7E`) lee 0, así que el módulo lee el valor guardado: `0xC31B3A80` si el byte en `0xC31B954C` es 0; si no, `0xC31B9348`. Unos 5 s tras arrancar escribe la caché de exclusión `0xC3768BB4` y avisa al gestor, `c049ef18(0xC3766AEC, up, 0x24, 1)`, para que la fila salga de gris. Esto se hace desde la tarea del driver. Intentos anteriores de llamar a otras funciones desde esa tarea colgaron la cámara.
+
+### Mando por el jack: micro externo y mando remoto
+
+Desde la 1.4.0. Con una conexión de micro y mando entran por el mismo jack el micro o el generador de TC (punta y anillo 1) y el mando remoto (manguito). De serie, con esa conexión (en adelante, «la caja») la fp graba siempre sus micros internos.
+
+El detector del jack está en `0xC3425BCC` (lo construye `c02e3a48`) y lee tres dispositivos HAL: `+4` → `0xE3` (clavija dentro = 0), `+8` → `0xE2` (tipo de clavija) y `+0xC` → `0xE1` (la línea del mando, la que lee la tarea RemoDev). Tiene tres bytes de forzado, `+0x10/+0x11/+0x12`, a 0 al arrancar. Su consulta `estado(n)` (`c02e3ac0`, método +0xC):
+
+| n | Significa | Condición |
+|---|---|---|
+| 0 | clavija dentro | E3 == 0, o cualquier forzado |
+| 1 | mando | E3 == 0 y E2 == 0, o `+0x10` |
+| 2 | micro | E1 == 1 y E2 == 1, o `+0x11` |
+
+`c02e3e58` (la reevaluación del jack, con el objeto `0xC3425B50` = {detector, objeto de eventos de RemoDev}) llama a `c02e3ed0` (bandera de micro = 1, evento `0x65`) si hay clavija y micro, y si no a `c02e3f08` (bandera = 0, evento `0x66`). Las dos solo actúan si la bandera cambia. La bandera es el byte 0 de `0xC303384C` (`c0017ac8(c00178d8())`); el byte 4 (`0xC3033850`) dice que la lectura de pulsos del mando está activa (`c02e3508`). Todas las llamadas a `SetMic` (`c01fa178`, gestor `0xC31F7D84`) leen esa bandera.
+
+**Medido en cámara por consola (15-11, solo lectura salvo una llamada autorizada):** con la caja, «mando activo» = 1 incluso con el mando apagado, y la bandera de micro = 0: E2 dice «mando», así que la cámara nunca ve un micro. Con el forzado `+0x11` = 1 y una llamada a `c02e3e58(0xC3425B50)`: bandera 0 → 1, `MIC_MANAGER` 0 → 1 (jack), evento `0x66` → `0x65`, y el mando sigue funcionando. Pablo grabó audio externo y controló la cámara con el mando Bluetooth a la vez.
+
+**Lo que hace TCAudio** (una vez por segundo, a partir de unos 5 s del arranque, desde `tca_tick`):
+
+1. Lee E3 con el método +0xC de su dispositivo, como `c02e3c28`. Sin clavija, olvida la caja. Con clavija y «mando activo» = 1, recuerda «caja vista»: así aguanta el parpadeo de «mando activo» al encender el mando.
+2. Con la caja vista pone `+0x11` = 1, también en Internal: la cámara queda en modo jack y las filas de TCAudio eligen la entrada en el códec como sin la caja (con TC e Internal, micros en un canal y TC en el otro). Sin clavija, lo pone a 0. (Una versión de prueba lo quitaba en Internal: la cámara pasaba a sus micros en los dos canales y se perdía el TC.) `+0x10..+0x13` está reclamado y el diario lo devuelve a 0 al apagar.
+3. Si el forzado cambió, o está puesto y la bandera sigue en 0, llama a `c02e3e58(0xC3425B50)`. Nunca grabando.
+
+La llamada se hace desde la tarea de audio, no desde RemoDev. Funciona en cámara, pero es un riesgo a revisar (ver Cuestiones abiertas).
+
+**Lo que no funcionó** (variantes de la 1.4.0, todas el 15-11):
+
+- **Parchear el detector al cargar** (`0xC02E3D0C`, el `bne` tras la prueba de E1, a `nop`): la cámara arrancaba sin las filas de TCAudio y SupManager no daba acceso a los módulos, aunque LOAD.LOG los daba por cargados. La huella era `0C C072F000 00000060 USB-Shell` (REPARADO), en todos los arranques fallidos y en ninguno bueno. Rellenar el fichero para que no midiera 0x9000 no lo arregló, así que la causa fue escribir en el detector durante el arranque. El mecanismo exacto no se ha localizado.
+- **El mismo parche a los ~5 s:** arranca bien, pero no consigue el micro, porque con la caja E2 = 0.
+- **Anular la llamada que baja el micro** (`0xC02E3EB4`, `bl c02e3f08`): no sirve por lo mismo, la bandera nunca sube.
+- **Forzar `+0x11` y pedir a la interfaz que aplique** (`MV_fpMicApl`): el forzado se escribe, pero la petición nunca se atiende (`pending` = 2 en la consola) y nadie reevalúa el jack. Además, al encender el mando «mando activo» parpadea y el forzado se perdía.
 
 ## Lecciones
 
 - **Todo puntero al módulo debe ir reclamado.** Una versión de desarrollo cambiaba `_c31cc81c` sin reclamarlo. Al apagar, el diario quitaba el tick pero no el puntero, y la cámara se colgaba con el LED rojo encendido (compatible con una llamada a memoria liberada, ver `HOOKS_AT_POWER_OFF.md` de fpSup). Reclamarlo después de `c00d6ec0`, para que el tick salga antes, lo arregló. Las pruebas grabando no llegan a ese camino.
 - **No llames a funciones del firmware desde la tarea del driver** si no estás seguro de sus argumentos.
 - **Escuchar un canal a ratos no basta para detectarlo.** Una trama solo vale con 80 bits entre dos sincronías, y una ventana corta puede no completar ninguna. Si el otro canal solo se revisaba a ratos y el TC le llegaba después del enganche, Auto no lo detectaba nunca. Lo reproduce `test_ltc_reaching_the_right_after_the_lock_selects_the_mic`.
+- **No escribas en código o datos vivos de la cámara al cargar.** El parche del detector del jack escrito en `sup_entry` dejó a la interfaz sin las filas de TCAudio ni SupManager, sin rastro en el registro salvo una zona de USB-Shell reparada. Lo mismo, a los ~5 s desde el tick, no da problemas. Ya pasó con el DSP de audio (30-10).
+- **Mide antes de parchear.** La hipótesis «el pulso del mando baja el micro» venía de leer el código y era falsa: con la caja, la cámara nunca veía un micro. Una lectura por consola de cinco direcciones lo aclaró en minutos, tras tres variantes fallidas.
 - **Señal no es TC.** El Zoom M4 lleva la entrada y la salida de TC en el mismo jack: punta entrada, anillo salida (manual del M4, p. 13). Con un cable estéreo, el canal izquierdo de la fp queda en la entrada del Zoom y recoge por diafonía capacitiva un eco del LTC del anillo: picos en cada flanco y casi nada entre ellos (C001_466, grabada con TC-IN apagado). El decodificador ve decenas de cruces falsos por bit y no saca ni una trama, así que el módulo lo trata como audio.
 
 ## Pruebas
@@ -96,5 +131,9 @@ Grabación de audio es el ajuste de serie. Su valor efectivo es `ctx+0xE0`, que 
 
 - Por qué una toma puede empezar con 2 fotogramas de diferencia si se graba justo tras enganchar. **Hipótesis:** el reajuste, que actúa como mucho cada segundo, aún no había actuado.
 - Mensaje `1474` en arranque en frío: es la clave del texto "Now Connecting" en `SYS_WarningMsg`. También sale sin TCAudio. **Hipótesis:** la resolución de textos en `C05E5B58`, que engancha el cargador.
-- Grabar el micro de la cámara con el Deity TC-1 en A-OUT (TC por el canal 1 y audio por el 2). Haría falta un valor del registro 5 del códec que junte los micros con solo el canal 1 del jack, y no se ha encontrado: 0x28 corta el canal 1 y 0x29 lo suma con el 2.
+- Deity TC-1 en A-OUT con Internal: resuelto en la 1.3.0 por la rama INT (registro 10 sin el bit 0x20). Falta confirmarlo en cámara.
+- **Revisión pendiente: actualización de estados.** La petición a la interfaz (`MV_fpMicApl`), con la que la 1.3.0 aplica al momento el cambio de entrada, nunca se atiende (medido: `pending` = 2). Afecta al «aplicar ya» al cambiar de entrada y a la actualización de los vúmetros. Si se arregla, la reevaluación del jack podría hacerse desde la interfaz y no desde la tarea de audio.
+- La llamada a `c02e3e58` desde la tarea de audio: funciona, pero no es el hilo donde la hace la cámara.
+- Arranques en caliente y tomas largas con la caja.
+- Por qué escribir en el detector al cargar rompía la interfaz, y qué escribía en `0xC072F000`.
 - Drop-frame con TC-IN: la cámara cuenta sin drop-frame aunque el generador vaya en DF (C001_435: 17:20:59:29 → 17:21:00:00). No se ha buscado en el firmware dónde se decide.

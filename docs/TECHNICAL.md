@@ -21,6 +21,8 @@ The DSP fixes its output when it starts. Clearing the bit while running turns th
 | `0xC00CEB94` | `mov r3,#2` → `mov r3,#1` | Re-jams at 1 frame of error |
 | `0xC00DA154`, `0xC00DAA18` | `movs r1,#2` → another value, when needed | Internal mic with the jack |
 | `0xC00DA154`, `0xC00DAA14` | `bne` → `b`, when needed | Stereo mics with TC-IN off |
+| `0xC00DA1B0`, `0xC00DAA74` | `movs r1,#0x24` → `#0x29`, when needed | Internal with TC on the left, through the INT branch (1.3.0) |
+| `0xC3425BDD` | jack-detector force byte set to 1, with the box (data, not code) | Mic and remote on the same jack (1.4.0) |
 | `0xC00D6EC0` | jump to `tca_tick` | Runs once per audio block in the driver task |
 | `0xC31CC81C` | pointer to `tca_meter` | Meter callback, set at run time |
 
@@ -75,16 +77,49 @@ Input routing is register 5 of the audio codec, written through `c00daf70(reg, v
 | 0x29 | Both mics | Both jack inputs summed | C001_385: 388 of 391 frames with the right input empty; C001_386: unusable with audio on it |
 | 0x2B | Mixed | Mixed | C001_390: unusable |
 
-The module writes the value at both sites and flushes the caches, from the driver task, using the firmware cache routines. Auto uses 0x28 when LTC arrives on both channels. Internal uses 0x28, or 0x29 if TC was seen on the left. The TC channel becomes right and left is cloned over it. With TC-IN off and Internal, both `bne` go to the internal-mic branch: stereo, jack disconnected (C001_399). Int+Ext Mics uses 0x28 with TC-IN off (C001_401). On a row change the module writes the sites, clears the mic manager word and calls `SetMic(1)` from the UI thread, so the camera rewrites the codec as when a jack is plugged in. Auto with TC on both channels has no row change, so it applies the next time the camera writes the register. Both rows are stored in the module file (`tca_rec`), never in camera settings. While TC-IN is on, Int+Ext Mics is posted back to Off with `0xC0593F30`. Stock rows go grey natively; the copied row has no such link, and binding `SelectLock` to a variable did not work. The codec model has not been identified.
+The module writes the value at both sites and flushes the caches, from the driver task, using the firmware cache routines. Auto uses 0x28 when LTC arrives on both channels. Internal uses 0x28, or 0x29 if TC was seen on the left. Since 1.3.0, 0x29 goes through the **INT branch** of both functions (the last case, which writes 0x24 and leaves register 10 without bit 0x20): the camera is diverted to that branch and its `movs r1,#0x24` constant becomes 0x29 (high halfword of `0xC00DA1B0`, low halfword of `0xC00DAA74`). The right jack input then stays out, so a Deity TC-1 on A-OUT (TC on 1, audio on 2) can record the camera mic. The TC channel becomes right and left is cloned over it. With TC-IN off and Internal, both `bne` go to the internal-mic branch: stereo, jack disconnected (C001_399). Int+Ext Mics uses 0x28 with TC-IN off (C001_401). On a row change the module writes the sites, clears the mic manager word and calls `SetMic(1)` from the UI thread, so the camera rewrites the codec as when a jack is plugged in. Auto with TC on both channels has no row change, so it applies the next time the camera writes the register. Both rows are stored in the module file (`tca_rec`), never in camera settings. While TC-IN is on, Int+Ext Mics is posted back to Off with `0xC0593F30`. Stock rows go grey natively; the copied row has no such link, and binding `SelectLock` to a variable did not work. The codec model has not been identified.
 
 ### Audio setting
 
 Audio Recording is the stock setting. Its effective value is `ctx+0xE0`, updated on leaving the menu. On a cold boot with TC-IN the setting object's copy (`0xC31ACC7E`) reads 0, so the module reads the stored value directly: `0xC31B3A80` if the byte at `0xC31B954C` is 0, otherwise `0xC31B9348`. About 5 s after boot it writes the exclusion cache `0xC3768BB4` and notifies the exclusion manager, `c049ef18(0xC3766AEC, up, 0x24, 1)`, so the row leaves grey. This runs from the driver task. Earlier attempts calling other functions from that task hung the camera.
 
+### Remote on the jack: external mic and remote control
+
+Since 1.4.0. With a mic-and-remote connection, the mic or TC generator (tip and ring 1) and the remote control (sleeve) share the same jack. Stock, with that connection ("the box" below) the fp always records its internal mics.
+
+The jack detector lives at `0xC3425BCC` (built by `c02e3a48`) and reads three HAL devices: `+4` → `0xE3` (plug in = 0), `+8` → `0xE2` (plug type) and `+0xC` → `0xE1` (the remote line, the one the RemoDev task reads). It has three force bytes, `+0x10/+0x11/+0x12`, zero at boot. Its `state(n)` query (`c02e3ac0`, method +0xC):
+
+| n | Meaning | Condition |
+|---|---|---|
+| 0 | plug in | E3 == 0, or any force byte |
+| 1 | remote | E3 == 0 and E2 == 0, or `+0x10` |
+| 2 | mic | E1 == 1 and E2 == 1, or `+0x11` |
+
+`c02e3e58` (jack re-evaluation, on object `0xC3425B50` = {detector, RemoDev event object}) calls `c02e3ed0` (mic flag = 1, event `0x65`) if there is a plug and a mic, otherwise `c02e3f08` (flag = 0, event `0x66`). Both act only when the flag changes. The flag is byte 0 at `0xC303384C` (`c0017ac8(c00178d8())`); byte 4 (`0xC3033850`) says the remote pulse reader is active (`c02e3508`). Every `SetMic` call (`c01fa178`, manager `0xC31F7D84`) reads that flag.
+
+**Measured on camera over the console (15-11, read-only except one authorised call):** with the box, "remote active" = 1 even with the remote off, and the mic flag = 0: E2 says "remote", so the camera never sees a mic. With force byte `+0x11` = 1 and one call to `c02e3e58(0xC3425B50)`: flag 0 → 1, `MIC_MANAGER` 0 → 1 (jack), event `0x66` → `0x65`, and the remote kept working. Pablo recorded external audio while controlling the camera with the Bluetooth remote.
+
+**What TCAudio does** (once a second, from about 5 s after boot, in `tca_tick`):
+
+1. Reads E3 through its device's method +0xC, as `c02e3c28` does. No plug: forget the box. Plug in and "remote active" = 1: remember "box seen", which rides out the "remote active" flicker when the remote powers up.
+2. With the box seen, sets `+0x11` = 1, on Internal too: the camera stays in jack mode and TCAudio's rows pick the codec input as without the box (with TC and Internal, mics on one channel and TC on the other). With no plug, clears it. (A test build cleared it on Internal: the camera went to its mics on both channels and TC was lost.) `+0x10..+0x13` is claimed and the journal returns it to 0 at power-off.
+3. If the force byte changed, or it is set and the flag is still 0, calls `c02e3e58(0xC3425B50)`. Never while recording.
+
+The call is made from the audio task, not from RemoDev. It works on camera, but it is a risk to review (see Open questions).
+
+**What did not work** (1.4.0 variants, all on 15-11):
+
+- **Patching the detector at load time** (`0xC02E3D0C`, the `bne` after the E1 test, to `nop`): the camera booted without TCAudio's rows and SupManager gave no access to the modules, although LOAD.LOG listed them as loaded. The fingerprint was `0C C072F000 00000060 USB-Shell` (REPAIRED), in every failing boot and in no good one. Padding the file so it was not 0x9000 long did not fix it, so the cause was writing to the detector during boot. The exact mechanism has not been found.
+- **The same patch after ~5 s:** boots fine, but gets no mic, because with the box E2 = 0.
+- **Suppressing the call that clears the mic** (`0xC02E3EB4`, `bl c02e3f08`): useless for the same reason; the flag never rises.
+- **Forcing `+0x11` and asking the UI to apply it** (`MV_fpMicApl`): the force byte is written, but the request is never serviced (`pending` = 2 on the console) and nothing re-evaluates the jack. Also, when the remote powers up "remote active" flickers and the force was dropped.
+
 ## Lessons
 
 - **Every pointer into the module must be claimed.** A development version set `_c31cc81c` without a claim. At power-off the journal removed the tick but not the pointer, and the camera hung with the red LED on (consistent with a call into released memory, see fpSup's `HOOKS_AT_POWER_OFF.md`). Claiming it after `c00d6ec0`, so the tick is gone first, fixed it. Recording tests do not reach this path.
 - **Do not call firmware functions from the driver task** unless you are sure of their arguments.
+- **Do not write to the camera's live code or data at load time.** The jack-detector patch written in `sup_entry` left the UI without TCAudio's rows and SupManager, with no trace in the log except a repaired USB-Shell area. The same write from the tick after ~5 s is fine. The audio DSP taught the same on 30-10.
+- **Measure before patching.** The "remote pulse clears the mic" hypothesis came from reading code and was wrong: with the box, the camera never saw a mic. Reading five addresses over the console settled it in minutes, after three failed variants.
 
 ## Tests
 
@@ -94,4 +129,8 @@ Audio Recording is the stock setting. Its effective value is `ctx+0xE0`, updated
 
 - Why a short take can start 2 frames off when recording right after locking. **Hypothesis:** the re-jam, which runs at most about once per second, had not acted yet.
 - Message `1474` on cold boot: it is the text key of "Now Connecting" in `SYS_WarningMsg`. It also appears without TCAudio. **Hypothesis:** the text lookup at `C05E5B58`, which the loader hooks.
-- Recording the camera mic with the Deity TC-1 on A-OUT (TC on channel 1, audio on channel 2). It would need a codec register 5 value that pairs the mics with jack channel 1 alone, and none has been found: 0x28 cuts channel 1 and 0x29 sums it with channel 2.
+- Deity TC-1 on A-OUT with Internal: solved in 1.3.0 through the INT branch (register 10 without bit 0x20). Still to confirm on camera.
+- **Pending review: state updates.** The UI request (`MV_fpMicApl`) that 1.3.0 uses to apply an input change at once is never serviced (measured: `pending` = 2). It affects the immediate apply when the input changes and the meter updates. If fixed, the jack re-evaluation could run from the UI instead of the audio task.
+- The `c02e3e58` call from the audio task: it works, but it is not the thread where the camera makes it.
+- Warm boots and long takes with the box.
+- Why writing to the detector at load time broke the UI, and what wrote to `0xC072F000`.
