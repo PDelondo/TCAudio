@@ -39,15 +39,32 @@ typedef int16_t s16;
 #define MIC_B_WORD    0x20052100u       /* más el valor */
 #define IN_JACK       0x02u             /* registro 5: jack directo, de serie */
 #define IN_MIC_R      0x28u             /* micros a la izquierda, jack derecho a la derecha */
-#define IN_MIC_L      0x29u             /* micros a la izquierda, jack izquierdo cruzado: y el derecho, sumado */
+#define IN_MIC_L      0x29u             /* micros a la izquierda, jack izquierdo cruzado. Por la rama INT, que deja
+                                         * el registro 10 sin el bit 0x20: el jack derecho no entra (Deity A-OUT) */
 #define IN_MICS       0x24u             /* estéreo de los micros: sigue la rama INT, que además limpia el
                                          * bit 0x20 del registro 10, el que deja entrar el jack derecho */
 #define MIC_A_SKIP    0x2102E00Du       /* bne -> b: hacia la rama INT de c00da128 */
+#define SITE_INT_A    0xC00DA1B0u       /* media palabra alta: movs r1, #0x24 de la rama INT de c00da128 */
+#define SITE_INT_B    0xC00DAA74u       /* media palabra baja: lo mismo en c00da888 */
+#define INT_MOVS      0x2100u           /* movs r1, #valor */
 #define SITE_MIC_C    0xC00DAA14u       /* cmp r0, #1; bne en c00da888 */
 #define MIC_C_STOCK   0xD10D2801u
 #define MIC_C_SKIP    0xE00D2801u
 #define MIC_MANAGER   0xC31F7D84u       /* +0: 0 micro interno, 1 jack */
 #define F_SETMIC      0xC01FA178u       /* SetMic(gestor, modo), ARM: 0 interno, 1 jack */
+/* Micro y mando por el mismo jack. El detector del jack (0xC3425BCC, FUN_c02e3a48) lee
+ * E3 (+4, clavija dentro), E2 (+8, tipo de clavija) y E1 (+0xC, línea del mando). Con la caja, E2 dice
+ * «mando»: la cámara nunca da el micro por presente y graba los micros internos. TCAudio pone a 1 el
+ * byte de forzado +0x11 del detector («micro presente»), que no toca la lectura de los pulsos (+0x10),
+ * y le pide a la cámara que reevalúe el jack con su propia función. Comprobado en cámara el 15-11. */
+#define DET_FORCE     0xC3425BDCu       /* detector del jack 0xC3425BCC + 0x10: forzados +0x10/+0x11/+0x12 */
+#define DET_FORCE_MIC 0x0000FF00u       /* +0x11: «micro presente» */
+#define STATE_MIC     0xC303384Cu       /* *(c0017ac8(c00178d8())) byte 0: micro en el jack */
+#define STATE_REMOTE  0xC3033850u       /* byte 4: el mando está activo (c02e3508) */
+#define F_JACK_EVAL   0xC02E3E58u       /* (obj), ARM: la reevaluación del jack de la tarea RemoDev */
+#define REMODEV_JACK  0xC3425B50u       /* RemoDev 0xC3425B3C + 0x14: {detector, objeto de eventos} */
+#define DET_E3        0xC3425BD0u       /* detector + 4: dispositivo HAL 0xE3 (0 = clavija dentro) */
+#define EVAL_TICKS    48u               /* ~1 s entre comprobaciones */
 #define F_DCACHE      0xC000E91Cu
 #define F_ICACHE      0xC000EABCu
 /* Las filas. Registro de la UI: fpSup/screenflip/native/flip.c (Bei). */
@@ -134,6 +151,14 @@ struct tca {
     u32 mic_name[3], mix_name[3];       /* MV_fpMicInt, MV_fpMicMix */
     u32 locked;                         /* último TC-IN avisado a la fila, + 1 */
     u32 row_ok;                         /* la fila Int+Ext Mics está puesta */
+    u32 int_ok;                         /* los sitios de la rama INT son los de serie */
+    u32 int_a, int_b;                   /* sus palabras de serie */
+    u32 apply_name[3];                  /* MV_fpMicApl: pide a la UI aplicar la entrada */
+    u32 apply_ok;                       /* la variable existe y está suscrita */
+    u32 pending;                        /* la entrada cambió y aún no se ha aplicado */
+    u32 apply_seq;
+    u32 force_mic;                      /* el byte +0x11 del detector está a 1 */
+    u32 latch, eval, eval_at;           /* caja vista desde que entró la clavija; reevaluar; último tick */
     const struct sl_svc *svc;
     u32 block;
     char path[64];
@@ -169,6 +194,17 @@ static u32 next_frame(u32 w, u32 fps)
 }
 
 static int audio_on(void);
+static int recording(void);
+
+/* ¿Hay clavija? El dispositivo 0xE3 del detector, leído como lo lee c02e3c28 (método +0xC). */
+static u32 jack_in(void)
+{
+    uintptr_t dev = R32(DET_E3);
+
+    if (!dev || (dev & 3u) || !R32(dev))
+        return 1u;
+    return ((u32 (*)(uintptr_t))R32(R32(dev) + 0xCu))(dev) == 0u;
+}
 
 /* ¿La señal va a la velocidad de la cámara? La media de las tramas separa 2002 de 2000 muestras
  * (23,98 de 24) y 1601,6 de 1600 (29,97 de 30), que una trama suelta no distingue. */
@@ -402,21 +438,31 @@ static u32 wanted_input(struct tca *t, u32 on, u32 audio)
     return IN_JACK;
 }
 
-static void select_input(struct tca *t, u32 on, u32 audio)
+/* Devuelve si la entrada ha cambiado: hay que aplicarla. IN_MICS e IN_MIC_L van por la rama INT,
+ * cambiando su constante; si sus sitios no son los de serie, IN_MIC_L sigue por la rama del jack. */
+static u32 select_input(struct tca *t, u32 on, u32 audio)
 {
-    u32 want = wanted_input(t, on, audio);
+    u32 want = wanted_input(t, on, audio), via_int;
 
     t->mic = on && want != IN_JACK && R32(MIC_MANAGER);
     if (want == t->input)
-        return;
+        return 0;
     t->input = want;
     if (on && want != IN_JACK)
         t->channel = 1u;
-    R32(SITE_MIC_A) = want == IN_MICS ? MIC_A_SKIP : MIC_A_WORD | want << 16;
-    R32(SITE_MIC_B) = MIC_B_WORD | (want == IN_MICS ? IN_JACK : want);
-    R32(SITE_MIC_C) = want == IN_MICS ? MIC_C_SKIP : MIC_C_STOCK;
+    via_int = want == IN_MICS || (want == IN_MIC_L && t->int_ok);
+    R32(SITE_MIC_A) = via_int ? MIC_A_SKIP : MIC_A_WORD | want << 16;
+    R32(SITE_MIC_B) = MIC_B_WORD | (via_int ? IN_JACK : want);
+    R32(SITE_MIC_C) = via_int ? MIC_C_SKIP : MIC_C_STOCK;
+    if (t->int_ok) {
+        u32 v = INT_MOVS | (via_int ? want : IN_MICS);
+
+        R32(SITE_INT_A) = (t->int_a & 0xFFFFu) | v << 16;
+        R32(SITE_INT_B) = (t->int_b & 0xFFFF0000u) | v;
+    }
     ((void (*)(void))F_DCACHE)();
     ((void (*)(void))F_ICACHE)();
+    return 1;
 }
 
 /* El DSP mide los picos antes de clonar: el vúmetro del TC muestra el del audio. */
@@ -442,12 +488,39 @@ static u32 tca_tick(void)
         return on && !audio_on();
     t->ticks++;
     t->cloning &= on;
+    /* Con la caja (el mando se ha visto activo desde que entró la clavija), «micro presente» forzado en
+     * el detector, sea cual sea Audio Input: la cámara queda en modo jack y las filas de TCAudio deciden
+     * la entrada en el códec, como sin la caja. Nunca al cargar: escribir en el detector durante el
+     * arranque dejaba sin filas a TCAudio y sin acceso a SupManager (variantes 1.4.0, 15-11). */
+    if (t->ticks >= SETTLE_TICKS && t->ticks - t->eval_at >= EVAL_TICKS) {
+        u32 want;
+
+        t->eval_at = t->ticks;
+        if (!jack_in())
+            t->latch = 0;                               /* sin clavija: se olvida la caja */
+        else if (B8(STATE_REMOTE))
+            t->latch = 1;                               /* la caja se vio: aguanta el parpadeo al encender el mando *
+        want = t->latch;                /* también en Internal: TCAudio elige la entrada en el códec desde el
+                                         * modo jack (con TC, micros en un canal y TC en el otro) */
+        if (want != t->force_mic) {
+            t->force_mic = want;
+            B8(DET_FORCE + 1u) = (uint8_t)want;
+            t->eval = 1;
+        }
+        /* La cámara reevalúa el jack solo cuando cambia algo en él: se lo pedimos con su propia función
+         * (comprobado por consola el 15-11: micro 0 -> 1, evento 0x65). Se llama desde la tarea de audio:
+         * la petición a la UI (MV_fpMicApl) no se atiende; ver la revisión pendiente en docs/TECNICA.md. */
+        if ((t->eval || (want && !B8(STATE_MIC))) && !recording()) {
+            t->eval = 0;
+            ((void (*)(u32))F_JACK_EVAL)(REMODEV_JACK);
+        }
+    }
     if (t->row_ok && t->locked != on + 1u) {                 /* con TC-IN la fila Int+Ext Mics se queda en Off */
         t->locked = on + 1u;
         ((void (*)(u32, const char *, u32))F_UI_POST)(0, (const char *)t->mix_name, on ? 0u : t->mix);
     }
     if (!on) {
-        select_input(t, 0u, 0u);
+        t->pending |= select_input(t, 0u, 0u);
     } else {
         int audio;
         u32 cb = R32(METER_CB), mine = (u32)(uintptr_t)&tca_meter;
@@ -462,7 +535,13 @@ static u32 tca_tick(void)
         }
         if (sync_dsp(audio))
             pump(t);
-        select_input(t, 1u, (u32)audio);
+        t->pending |= select_input(t, 1u, (u32)audio);
+    }
+    /* la cámara solo reescribe el códec al grabar o al salir del menú: se le pide a la UI que lo
+     * haga ya. Nunca grabando, y una sola petición hasta que la UI la atienda. */
+    if (t->pending == 1u && t->apply_ok && !recording()) {
+        t->pending = 2u;
+        ((void (*)(u32, const char *, u32))F_UI_POST)(0, (const char *)t->apply_name, ++t->apply_seq);
     }
     return on;
 }
@@ -522,10 +601,18 @@ static void save_rows(struct tca *t)
 static void apply_now(struct tca *t)
 {
     select_input(t, R32(TC_ENABLED) != 0u, (u32)audio_on());
-    if (R32(MIC_MANAGER) == 1u) {
+    t->pending = 0;
+    if (R32(MIC_MANAGER) == 1u && !recording()) {
         R32(MIC_MANAGER) = 0;
         ((void (*)(u32, u32))F_SETMIC)(MIC_MANAGER, 1u);
     }
+}
+
+static u32 apply_requested(uintptr_t descriptor)
+{
+    (void)descriptor;
+    apply_now((struct tca *)(uintptr_t)tca_ctx);
+    return 0;
 }
 
 static u32 mic_changed(uintptr_t descriptor)
@@ -601,6 +688,25 @@ static u32 add_row(const struct sl_svc *svc, const char *name, const char *from,
     return 1;
 }
 
+/* Una variable de la UI sin fila: tca_tick la publica y la UI llama a apply_now en su hilo. */
+static u32 add_variable(const char *name, u32 (*changed)(uintptr_t))
+{
+    uintptr_t app = R32(GUI_OBJECT);
+    u32 def[3];
+
+    if (!app || (app & 3u) || !R32(app + APP_REGISTRY))
+        return 0;
+    if (!ui_variable(app, name)) {
+        def[0] = 0;
+        def[1] = (u32)(uintptr_t)name;
+        def[2] = 0;
+        if (((u32 (*)(uintptr_t, u32, const u32 *))F_UI_REGISTER)(app, 1u, def) || !ui_variable(app, name))
+            return 0;
+    }
+    ((u32 (*)(uintptr_t, const char *, uintptr_t))F_UI_SUBSCRIBE)(GUI_OBJECT, name, (uintptr_t)changed);
+    return 1;
+}
+
 static void add_rows(struct tca *t, const struct sl_svc *svc)
 {
     const char *base = (const char *)&tca_ctx;
@@ -611,6 +717,10 @@ static void add_rows(struct tca *t, const struct sl_svc *svc)
     t->mix_name[2] = 0x0078694Du;                       /* Mix */
     add_row(svc, (const char *)t->mic_name, base + tca_ui[0], base + tca_ui[1], t->forced, mic_changed);
     t->row_ok = add_row(svc, (const char *)t->mix_name, base + tca_ui[2], base + tca_ui[3], t->mix, mix_changed);
+    t->apply_name[0] = 0x665F564Du;                     /* MV_f */
+    t->apply_name[1] = 0x63694D70u;                     /* pMic */
+    t->apply_name[2] = 0x006C7041u;                     /* Apl */
+    t->apply_ok = add_variable((const char *)t->apply_name, apply_requested);
 }
 
 int sup_entry(void *block, const struct sl_svc *svc, const char *path)
@@ -632,6 +742,13 @@ int sup_entry(void *block, const struct sl_svc *svc, const char *path)
     if (svc->claim(svc, SITE_MIC_B, 4u, &stock, SL_EXCL)) return SL_RELEASE;
     stock = MIC_C_STOCK;
     if (svc->claim(svc, SITE_MIC_C, 4u, &stock, SL_EXCL)) return SL_RELEASE;
+    t->int_a = R32(SITE_INT_A);
+    t->int_b = R32(SITE_INT_B);
+    t->int_ok = t->int_a >> 16 == (INT_MOVS | IN_MICS) && (t->int_b & 0xFFFFu) == (INT_MOVS | IN_MICS) &&
+                !svc->claim(svc, SITE_INT_A, 4u, &t->int_a, SL_EXCL) &&
+                !svc->claim(svc, SITE_INT_B, 4u, &t->int_b, SL_EXCL);
+    stock = R32(DET_FORCE) & ~DET_FORCE_MIC;           /* +0x10..+0x13: nuestro byte, de serie a 0 */
+    if (svc->claim(svc, DET_FORCE, 4u, &stock, SL_EXCL)) return SL_RELEASE;
     stock = TICK_STOCK0;
     if (svc->claim(svc, SITE_TICK, 4u, &stock, SL_EXCL)) return SL_RELEASE;
     stock = TICK_STOCK1;

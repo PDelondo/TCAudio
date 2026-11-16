@@ -23,7 +23,7 @@ RING, RING_LEN, BLOCK = 0x52B00580, 0x4000, 0x2000
 FORCED_WORD = 35                    # struct tca .forced
 DSP = 0x52B049C0
 STOCK = {0xC00DA154: 0x2102D10D, 0xC00DAA14: 0xD10D2801, 0xC00DAA18: 0x20052102, 0xC00CEB94: 0xE3A03002, 0xC00960FC: 0xE3A03000, 0xC04A152C: 0x1A000001, 0xC00D6EC0: 0x8D04F84D,
-         0xC00D6EC4: 0x71DCF241}
+         0xC00D6EC4: 0x71DCF241, 0xC00DA1B0: 0x2124E00B, 0xC00DAA74: 0x20052124}
 
 
 def pcm():
@@ -111,6 +111,81 @@ class TcaudioTests(unittest.TestCase):
         cam.power_off()
         for a, s in STOCK.items():
             self.assertEqual(cam.w(a), s, hex(a))
+
+    def test_force_mic_latched_with_the_box(self):
+        """1.4.0: caja vista -> +0x11 a 1 y reevaluación (stub); aguanta el parpadeo y Internal; sin clavija -> 0."""
+        cam, forced = self.forced_cam()
+        for a in (0xC3425BDC, 0xC303384C, 0xC347D1D4, 0xC347E08F, 0xC3476609, 0xC358E140, 0xC35A952C):
+            try:
+                cam.mu.mem_map(a & ~0xFFF, 0x1000)
+            except Exception:
+                pass
+        calls = 0x2AA01F00                          # contador de llamadas a la reevaluación
+        cam.put(calls, 0)
+        cam.put(0xC02E3E58, 0xE59F100C)             # ldr r1, [pc, #12]
+        cam.put(0xC02E3E5C, 0xE5912000)             # ldr r2, [r1]
+        cam.put(0xC02E3E60, 0xE2822001)             # add r2, r2, #1
+        cam.put(0xC02E3E64, 0xE5812000)             # str r2, [r1]
+        cam.put(0xC02E3E68, 0xE12FFF1E)             # bx lr
+        cam.put(0xC02E3E6C, calls)
+        dev = 0x2AA01F40                            # dispositivo E3 falso: método +0xC devuelve r0 de *(dev+8)
+        cam.put(dev, dev + 0x10)                    # vtable
+        cam.put(dev + 0x10 + 0xC, 0x2AA01F80)       # método leer
+        for i, w in enumerate((0xE59F0004, 0xE5900000, 0xE12FFF1E, dev + 8)):
+            cam.put(0x2AA01F80 + 4 * i, w)          # ldr r0,=dev+8 ; ldr r0,[r0] ; bx lr
+        cam.put(dev + 8, 0)                         # 0 = clavija dentro
+        cam.put(0xC3425BD0, dev)
+        cam.put(0xC303384C, 0)                      # micro 0
+        cam.put(0xC3033850, 1)                      # mando activo
+        tick = cam.w(0xC00D6EC4) & ~1
+        for _ in range(300):
+            cam.call(tick, thumb=True)
+        self.assertEqual(cam.w(0xC3425BDC) >> 8 & 0xFF, 1)
+        self.assertGreater(cam.w(calls), 0)
+        cam.put(0xC3033850, 0)                      # parpadeo al encender el mando: sigue forzado
+        for _ in range(100):
+            cam.call(tick, thumb=True)
+        self.assertEqual(cam.w(0xC3425BDC) >> 8 & 0xFF, 1)
+        cam.put(forced, 1)                          # Internal: sigue forzado (modo jack)
+        for _ in range(100):
+            cam.call(tick, thumb=True)
+        self.assertEqual(cam.w(0xC3425BDC) >> 8 & 0xFF, 1)
+        cam.put(forced, 0)
+        for _ in range(100):
+            cam.call(tick, thumb=True)
+        self.assertEqual(cam.w(0xC3425BDC) >> 8 & 0xFF, 1)
+        cam.put(dev + 8, 1)                         # sin clavija: se olvida la caja
+        for _ in range(100):
+            cam.call(tick, thumb=True)
+        self.assertEqual(cam.w(0xC3425BDC) >> 8 & 0xFF, 0)
+        cam.power_off()
+        self.assertEqual(cam.w(0xC3425BDC) >> 8 & 0xFF, 0)
+
+    def test_box_with_tc_and_internal_keeps_the_tc_channel(self):
+        """1.4.0: con la caja, TC-IN y Internal, el forzado sigue, MIC_MANAGER en jack y el códec en 0x28."""
+        cam, forced = self.forced_cam()
+        for a in (0xC3425BDC, 0xC303384C, 0xC347D1D4, 0xC347E08F, 0xC3476609, 0xC358E140, 0xC35A952C):
+            try:
+                cam.mu.mem_map(a & ~0xFFF, 0x1000)
+            except Exception:
+                pass
+        cam.put(0xC02E3E58, 0xE12FFF1E)             # reevaluación: bx lr
+        dev = 0x2AA01F40
+        cam.put(dev, dev + 0x10)
+        cam.put(dev + 0x10 + 0xC, 0x2AA01F80)
+        for i, w in enumerate((0xE59F0004, 0xE5900000, 0xE12FFF1E, dev + 8)):
+            cam.put(0x2AA01F80 + 4 * i, w)
+        cam.put(dev + 8, 0)                         # clavija dentro
+        cam.put(0xC3425BD0, dev)
+        cam.put(0xC3033850, 1)                      # caja
+        cam.put(forced, 1)                          # Internal
+        self.feed(cam, pcm()[:BLOCK * 60])          # TC por la derecha
+        tick = cam.w(0xC00D6EC4) & ~1
+        for _ in range(300):
+            cam.call(tick, thumb=True)
+        self.assertEqual(cam.w(0xC3425BDC) >> 8 & 0xFF, 1)
+        self.assertEqual(cam.w(0xC31F7D84), 1)
+        self.assertEqual(cam.w(0xC00DAA18), 0x20052128)
 
     def test_ltc_reaches_the_mailbox(self):
         cam = self.boot()
@@ -335,7 +410,38 @@ class TcaudioTests(unittest.TestCase):
         self.assertEqual(cam.w(0xC00DAA18), 0x20052102)
         cam.put(forced, 1)
         self.feed_more(cam, bytes(data[BLOCK * 60:BLOCK * 64]))
-        self.assertEqual(cam.w(0xC00DAA18), 0x20052129)
+        self.assertEqual(cam.w(0xC00DA154), 0x2102E00D)            # 1.3.0: por la rama INT
+        self.assertEqual(cam.w(0xC00DAA14), 0xE00D2801)
+        self.assertEqual(cam.w(0xC00DAA18), 0x20052102)
+        self.assertEqual(cam.w(0xC00DA1B0), 0x2129E00B)
+        self.assertEqual(cam.w(0xC00DAA74), 0x20052129)
+
+    def test_internal_with_tc_on_the_left_goes_through_the_int_branch(self):
+        """1.3.0: Internal con el LTC solo a la izquierda va por la rama INT con 0x29, y vuelve a 0x24 en Auto."""
+        hw = lambda a: cam.w(a & ~3) >> (16 if a & 2 else 0) & 0xFFFF
+        cam, forced = self.forced_cam()
+        data = bytearray(pcm())
+        data[0::4], data[1::4], data[2::4], data[3::4] = data[2::4], data[3::4], bytes(len(data) // 4), bytes(len(data) // 4)
+        self.feed(cam, bytes(data[:BLOCK * 60]))
+        self.assertEqual(hw(0xC00DA1B2), 0x2124)
+        self.assertEqual(hw(0xC00DAA74), 0x2124)
+        cam.put(forced, 1)
+        self.feed_more(cam, bytes(data[BLOCK * 60:BLOCK * 64]))
+        self.assertEqual(cam.w(0xC00DA154), 0x2102E00D)
+        self.assertEqual(cam.w(0xC00DAA14), 0xE00D2801)
+        self.assertEqual(cam.w(0xC00DAA18), 0x20052102)
+        self.assertEqual(hw(0xC00DA1B2), 0x2129)
+        self.assertEqual(hw(0xC00DAA74), 0x2129)
+        self.assertEqual(cam.w(0xC00DA1B0) & 0xFFFF, 0xE00B)        # el resto de las palabras, intacto
+        self.assertEqual(cam.w(0xC00DAA74) >> 16, 0x2005)
+        cam.put(forced, 0)
+        cam.put(forced + 12, 0)                     # .both, como hace mic_changed
+        self.feed_more(cam, bytes(data[BLOCK * 64:BLOCK * 68]))
+        self.assertEqual(hw(0xC00DA1B2), 0x2124)
+        self.assertEqual(hw(0xC00DAA74), 0x2124)
+        self.assertEqual(cam.w(0xC00DA154), 0x2102D10D)
+        self.assertEqual(cam.w(0xC00DAA14), 0xD10D2801)
+        self.assertEqual(cam.w(0xC00DAA18), 0x20052102)
 
     def test_internal_without_tc_input_uses_both_mics(self):
         cam, forced = self.forced_cam()
