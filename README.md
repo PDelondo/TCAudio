@@ -187,7 +187,7 @@ Con Int+Ext Mics en On, Audio Input solo admite Auto. Int+Ext Mics toma el canal
 - Muestra el nivel del audio en los dos vúmetros, en vez del TC.
 - Solo engancha si el TC va a la misma velocidad que la cámara, como de serie. Distingue también 23,98 de 24 y 29,97 de 30.
 - Afina el reajuste del TC con la cámara parada: reajusta con 1 fotograma de error en lugar de 2. Esto también se aplica con la grabación de audio en OFF.
-- **Micro y mando por el mismo jack:** con una conexión que lleva un micro o un generador de TC y un mando remoto por el jack TSSR en el mismo jack de 3,5 mm, la fp grababa sus micros internos. Con Audio Input en Auto, en cuanto la cámara detecta el mando en el jack, TCAudio mantiene la entrada en el jack y los pulsos del mando ya no la pasan a los micros de la cámara. No hay que tocar el menú. Para grabar los micros de la cámara, pon Internal. Si sacas la clavija, la cámara vuelve a sus micros como siempre.
+- **Micro y mando por el mismo jack:** con una conexión que lleva un micro o un generador de TC y un mando remoto por el jack TRRS en el mismo jack de 3,5 mm, la fp grababa sus micros internos. Con Audio Input en Auto, en cuanto la cámara detecta el mando en el jack, TCAudio mantiene la entrada en el jack y los pulsos del mando ya no la pasan a los micros de la cámara. No hay que tocar el menú. Para grabar los micros de la cámara, pon Internal. Si sacas la clavija, la cámara vuelve a sus micros como siempre.
 
 ## Requisitos
 
